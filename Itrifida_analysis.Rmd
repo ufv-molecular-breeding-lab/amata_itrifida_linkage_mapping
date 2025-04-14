@@ -1,0 +1,2012 @@
+---
+title: "Linkage map and QTL mapping for _Ipomoea trifida_"
+author: "Ana Paula Alves da Mata"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: cosmo
+    toc_depth: 4
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, fig.align = "center", fig.width = 6, fig.height = 6, cache = TRUE, cache.lazy = FALSE, dev = "png", warning = FALSE)
+```
+
+# Experimental data and phenotypic analysis
+
+### About the data
+
+The data consists in **188 individuals**, including both parents, from a mapping population derived from the **M9×M19** cross (***Ipomoea trifida*** - 2*n* = 2*x* = 30) were evaluated. 
+
+This population was phenotyped at the International Potato Center (CIP) in San Ramon, Peru, in 2016 under screen house condition, in a **randomized complete block design** with **four replications**.
+
+```{r}
+data2016 <- read.csv("M9xM19_screenhouse.csv", header = TRUE, sep = ",")
+```
+
+```{r}
+colnames(data2016)
+length(unique(data2016$CIPN)) #188 different individuals
+str(data2016)
+table(data2016$Rep) #4 replications with the 188 individuals
+```
+
+To better organize the data we'll analyze:
+
+```{r, eval = -(8:9)}
+data2016 <- data2016[,c(2,4,16:19,5,7,9,11,13,15,34)]
+
+colnames(data2016) <- c("geno","rep","LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4",
+                        "LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3","PLANTH_TP1","PLANTH_TP2","VINDIA","LA")
+
+data2016$geno <- as.factor(data2016$geno)
+data2016$rep  <- as.factor(data2016$rep)
+
+summary(data2016)
+head(data2016)
+```
+
+## The mixed model
+
+$$y_{ij} = \mu + b_j + g_i + e_{ij}$$
+
+where $y_{ij}$ is the phenotype of the $i$th genotype in $j$th block; \\mu is the overall mean; $b_j$ is the fixed effect of the $j$th block (our replications); $g_i$ is the random effect of the $i$ genotype where $g_i \sim \mathcal{N}(0,\sigma_g^2)$ , and $\sigma_g^2$ is the genetic variance; and $e_{ij}$ is the random error, where $e_{ij} \sim \mathcal{N}(0, \sigma_e^2)$, and $\sigma_e^2)$ is the residual variance.
+
+#### Broad-sense heritability
+
+$$H^2 = \frac{\sigma_g^2}{\sigma_g^2 + \frac{\sigma_e^2}{r}}$$
+where $r$ is the number of blocks (replications).
+
+```{r, message = FALSE, warning = FALSE}
+#install.packages("sommer")
+library(sommer) #please make sure it's version 4.1.2
+```
+
+Here we have the analysis in a loop; it may take some time on some computers:
+
+```{r, eval = FALSE}
+mod.list <- modr.list <- LRT.list <- blup.list <- varcomp.list <- h2.list <- list()
+
+for(trait in c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4","LEFTPP_TP1",
+               "LEFTPP_TP2","LEFTPP_TP3","PLANTH_TP1","PLANTH_TP2","VINDIA","LA")) {
+  print(paste("Analysis for", trait))
+  
+  mod <- mmer(fixed = as.formula(paste(trait,"~ rep")),
+              random = ~ geno,
+              rcov = ~ units,
+              data = data2016,
+              date.warning = FALSE)
+  mod.list[[trait]] <- mod
+  
+  #reduced model 
+  modr <- mmer(fixed = as.formula(paste(trait,"~ rep")),
+               rcov = ~ units,
+               data = data2016,
+               date.warning = FALSE)
+  modr.list[[trait]] <- modr
+  
+  #likelihood ratio test (LRT)
+  LRTmod <- anova(mod,modr)
+  LRT.list[[trait]] <- LRTmod
+  
+  #BLUPS
+  blups.mod <- predict(mod, classify = "geno")
+  blup.list[[trait]] <- blups.mod
+  
+  #variance components
+  var <- summary(mod)$varcomp
+  varcomp.list[[trait]] <- var
+  
+  #heritability
+  h2 <- vpredict(mod, h2 ~ V1/(V1+V2/4))
+  h2.list[[trait]] <- h2
+  
+  rm(mod);rm(modr);rm(LRTmod);rm(blups.mod);rm(var);rm(h2)
+}
+```
+
+Saving the results:
+
+```{r, eval = FALSE}
+save(mod.list, file = "mod.list.RData")
+save(modr.list, file = "modr.list.RData")
+save(LRT.list, file = "LRT.list.RData")
+save(blup.list, file = "blup.list.RData")
+save(varcomp.list, file = "varcomp.list.RData")
+save(h2.list, file = "h2.list.RData")
+```
+
+Loading the results to avoid rerunning the entire analysis:
+
+```{r}
+load("mod.list.RData")
+load("modr.list.RData")
+load("LRT.list.RData")
+load("blup.list.RData")
+load("varcomp.list.RData")
+load("h2.list.RData")
+```
+
+### Means and coefficients of variation
+
+Here we see the mean (**m**) and the coefficients of variation (**cv**) of each trait:
+
+```{r, eval = FALSE}
+sd1 <- sqrt(varcomp.list[["LEAFSHAP1"]][["VarComp"]][[1]])
+m1 <- mean(blup.list$LEAFSHAP1$pvals$predicted.value)
+cv1 <- sd1/m1 
+cv1
+
+sd2 <- sqrt(varcomp.list[["LEAFSHAP2"]][["VarComp"]][[1]])
+m2 <- mean(blup.list$LEAFSHAP2$pvals$predicted.value)
+cv2 <- sd2/m2
+cv2
+
+sd3 <- sqrt(varcomp.list[["LEAFSHAP3"]][["VarComp"]][[1]])
+m3 <- mean(blup.list$LEAFSHAP3$pvals$predicted.value)
+cv3 <- sd3/m3 
+cv3
+
+sd4 <- sqrt(varcomp.list[["LEAFSHAP4"]][["VarComp"]][[1]])
+m4 <- mean(blup.list$LEAFSHAP4$pvals$predicted.value)
+cv4 <- sd4/m4 
+cv4
+
+sd5 <- sqrt(varcomp.list[["LEFTPP_TP1"]][["VarComp"]][[1]])
+m5 <- mean(blup.list$LEFTPP_TP1$pvals$predicted.value)
+cv5 <- sd5/m5 
+cv5
+
+sd6 <- sqrt(varcomp.list[["LEFTPP_TP2"]][["VarComp"]][[1]])
+m6 <- mean(blup.list$LEFTPP_TP2$pvals$predicted.value)
+cv6 <- sd6/m6 
+cv6
+
+sd7 <- sqrt(varcomp.list[["LEFTPP_TP3"]][["VarComp"]][[1]])
+m7 <- mean(blup.list$LEFTPP_TP3$pvals$predicted.value)
+cv7 <- sd7/m7
+cv7
+
+sd8 <- sqrt(varcomp.list[["PLANTH_TP1"]][["VarComp"]][[1]])
+m8 <- mean(blup.list$PLANTH_TP1$pvals$predicted.value)
+cv8 <- sd8/m8
+cv8
+
+sd9 <- sqrt(varcomp.list[["PLANTH_TP2"]][["VarComp"]][[1]])
+m9 <- mean(blup.list$PLANTH_TP2$pvals$predicted.value)
+cv9 <- sd9/m9 
+cv9
+
+sd10 <- sqrt(varcomp.list[["VINDIA"]][["VarComp"]][[1]])
+m10 <- mean(blup.list$VINDIA$pvals$predicted.value)
+cv10 <- sd10/m10 
+cv10
+
+sd11 <- sqrt(varcomp.list[["LA"]][["VarComp"]][[1]])
+m11 <- mean(blup.list$LA$pvals$predicted.value)
+cv11 <- sd11/m11
+cv11
+```
+
+### Variance components and heritabilities
+
+To make it easier, we extracted the variance components and the heritabilities of the traits into an XLSX file:
+
+```{r}
+varcomp <- cbind(t(varcomp.list[["LEAFSHAP1"]]), t(varcomp.list[["LEAFSHAP2"]]),
+                 t(varcomp.list[["LEAFSHAP3"]]), t(varcomp.list[["LEAFSHAP4"]]),
+                 t(varcomp.list[["LEFTPP_TP1"]]), t(varcomp.list[["LEFTPP_TP2"]]),
+                 t(varcomp.list[["LEFTPP_TP3"]]), t(varcomp.list[["PLANTH_TP1"]]),
+                 t(varcomp.list[["PLANTH_TP2"]]), t(varcomp.list[["VINDIA"]]),
+                 t(varcomp.list[["LA"]]))
+
+varcomp <- t(varcomp[1:2, ])
+colnames(varcomp) <- c("Variance components","Standard error")
+```
+
+```{r}
+h2 <- cbind(t(h2.list[["LEAFSHAP1"]]), t(h2.list[["LEAFSHAP2"]]), 
+            t(h2.list[["LEAFSHAP3"]]), t(h2.list[["LEAFSHAP4"]]),
+            t(h2.list[["LEFTPP_TP1"]]),  t(h2.list[["LEFTPP_TP2"]]),
+            t(h2.list[["LEFTPP_TP3"]]), t(h2.list[["PLANTH_TP1"]]),
+            t(h2.list[["PLANTH_TP2"]]), t(h2.list[["VINDIA"]]), 
+            t(h2.list[["LA"]]))
+
+colnames(h2) <- c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4",
+                  "LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3",
+                  "PLANTH_TP1","PLANTH_TP2","VINDIA","LA")
+
+h2 <- t(h2[1:2, ])
+colnames(h2) <- c("Estimate","Standard error")
+```
+
+```{r, eval = FALSE}
+#install.packages("rJava")
+#install.packages("writexl")
+#install.packages("xlsx")
+library(rJava)
+library(writexl)
+```
+
+```{r, eval = FALSE}
+xlsx::write.xlsx2(varcomp,paste0("GeneticParameters_2016.xlsx"), sheetName = "Variance components")
+xlsx::write.xlsx2(h2,paste0("GeneticParameters_2016.xlsx"), sheetName = "Heritabilities", append = TRUE)
+```
+
+## Correlations
+
+Pairwise Pearson’s correlations assuming a significant global level of 5%.
+
+Loading the data:
+
+```{r}
+load("blup.list.RData")
+```
+
+```{r}
+blups2016 <- data.frame(cbind(blup.list$LEAFSHAP1$pvals$predicted.value,
+                              blup.list$LEAFSHAP2$pvals$predicted.value,
+                              blup.list$LEAFSHAP3$pvals$predicted.value,
+                              blup.list$LEAFSHAP4$pvals$predicted.value,
+                              blup.list$LEFTPP_TP1$pvals$predicted.value,
+                              blup.list$LEFTPP_TP2$pvals$predicted.value,
+                              blup.list$LEFTPP_TP3$pvals$predicted.value,
+                              blup.list$PLANTH_TP1$pvals$predicted.value,
+                              blup.list$PLANTH_TP2$pvals$predicted.value,
+                              blup.list$VINDIA$pvals$predicted.value,
+                              blup.list$LA$pvals$predicted.value))
+
+colnames(blups2016) <- c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4","LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3","PLANTH_TP1","PLANTH_TP2","VINDIA","LA")
+
+rownames(blups2016) <- blup.list$pvals$geno
+
+cor(blups2016)
+```
+
+```{r, message = FALSE, warning = FALSE}
+library(PerformanceAnalytics)
+
+chart.Correlation(blups2016, histogram = TRUE, method = "pearson")
+
+correl2016 <- cor(blups2016)
+```
+
+A function for plotting correlations:
+
+```{r}
+chart.Correlation.nostars <- function (R, histogram = TRUE, method = c("pearson", "kendall", "spearman"), ...)
+{
+  x = checkData(R, method = "matrix")
+  if (missing(method))
+    method = method[1]
+  panel.cor <- function(x, y, digits = 2, prefix = "",
+                        use = "pairwise.complete.obs", method = "pearson",
+                        cex.cor, ...) {
+    usr <- par("usr")
+    on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- cor(x, y, use = use, method = method)
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste(prefix, txt, sep = "")
+    if (missing(cex.cor))
+      cex <- 0.8/strwidth(txt)
+    test <- cor.test(as.numeric(x), as.numeric(y), method = method)
+    text(0.5, 0.5, txt, cex = cex * (abs(r) + 0.3)/1.3)
+  }
+  
+  f <- function(t) {
+    dnorm(t, mean = mean(x), sd = sd.xts(x))
+  }
+  
+  dotargs <- list(...)
+  dotargs$method <- NULL
+  rm(method)
+  
+  hist.panel = function(x, ... = NULL) {
+    par(new = TRUE)
+    hist(x, col = "light gray", probability = TRUE,
+         axes = FALSE, main = "", breaks = "FD")
+    lines(density(x, na.rm = TRUE), col = "red", lwd = 1)
+    rug(x)
+  }
+  
+  if (histogram)
+    pairs(x, gap = 0, lower.panel = panel.smooth, 
+          upper.panel = panel.cor,
+          diag.panel = hist.panel)
+  else 
+    pairs(x, gap = 0, lower.panel = panel.smooth, 
+          upper.panel = panel.cor)
+}
+```
+
+```{r, fig.width = 14, fig.height = 8, message = FALSE, warning = FALSE}
+library(ggplot2)
+
+get_upper_tri <- function(correl2016) {
+  correl2016[lower.tri(correl2016)] <- NA
+  return(correl2016)
+}
+upper_tri <- get_upper_tri(correl2016)
+```
+
+Plot:
+
+```{r, fig.width = 14, fig.height = 8}
+library(reshape2)
+
+cor_melt <- melt(upper_tri, na.rm = TRUE)
+is.num <- sapply(cor_melt, is.numeric)
+cor_melt[is.num] <- lapply(cor_melt[is.num], round, 2)
+
+ggheatmap <- ggplot(cor_melt, aes(Var2, Var1, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "purple", high = "orange", mid = "white",  midpoint = 0, limit = c(-1, 1), space = "Lab", name = "Pearson\nCorrelation") +
+  scale_y_discrete (position = "right") +
+  theme_minimal() + # minimal theme
+  theme(axis.text.x = element_text(vjust = 1, hjust = 1, angle = 45, size = 15), axis.text.y = element_text(size = 15)) +
+  coord_fixed() +
+  geom_text(aes(Var2, Var1, label = value), color = "black", size = 5) +
+  theme(axis.title.x = element_blank(), axis.title.y = element_blank(), panel.grid.major = element_blank(), panel.border = element_blank(), panel.background = element_blank(), axis.ticks = element_blank(), legend.justification = c(1, 0), legend.position = c(0.4, 0.7), legend.direction = "horizontal") +
+  guides(fill = guide_colorbar(barwidth = 15, barheight = 2, title.position = "top", title.hjust = 0.5)); ggheatmap
+
+ggsave("ggheatmap2016.pdf", width = 18, height = 15)
+```
+
+# Genotypic analysis
+
+## Genetic map
+
+```{r, message = FALSE}
+library(onemap)
+library(tidyverse)
+```
+
+### Reading data and filtering
+
+Load the data into Onemap:
+
+```{r}
+vcf <- onemap_read_vcfR(vcf = "all_variants_trifida_merged.vcf",
+                        cross = "outcross", 
+                        parent1 = "CIP107665.9.merged", 
+                        parent2 = "CIP107665.19.merged",
+                        only_biallelic = TRUE, 
+                        verbose = TRUE)
+
+save(vcf, file = "vcf.RData")
+load("vcf.RData")
+vcf
+```
+
+Plot of `r vcf$n.mar` SNPs vs. `r vcf$n.ind` individuals:
+
+```{r}
+plot(vcf)
+```
+
+Filter for *marker* missing data:
+
+```{r, echo = -(2:3)}
+vcf_filtered <- filter_missing(vcf, by = "markers", threshold = 0.20)
+rm(vcf)
+gc()
+
+vcf_filtered
+```
+
+Plot of `r vcf_filtered$n.mar` filtered SNPs (markers with missing \< 20%):
+
+```{r}
+plot(vcf_filtered)
+```
+
+Filter for *individual* missing data:
+
+```{r}
+vcf_filtered <- filter_missing(vcf_filtered, by = "individuals", threshold = 0.50)
+save(vcf_filtered, file = "vcf_filtered.RData")
+
+write_onemap_raw(vcf_filtered, file.name = "vcf_filtered.raw")
+vcf_filtered
+```
+
+Plot of `r vcf_filtered$n.ind` filtered individuals (markers with missing \< 50%):
+
+```{r}
+plot(vcf_filtered)
+```
+
+Perform segregation test:
+
+```{r, echo = -(3:4)}
+seg_test <- test_segregation(vcf_filtered)
+save(seg_test, file = "seg_test.RData")
+
+rm(vcf_filtered)
+gc()
+
+print(seg_test)
+plot(seg_test)
+
+no_dist <- select_segreg(seg_test, distorted = FALSE, numbers = TRUE)
+length(no_dist)
+save(no_dist, file = "no_dist.RData")
+```
+
+Plotting $\chi^2$ tests across chromosomes:
+
+```{r, fig.width = 7, fig.height = 5}
+chi_data <- print(seg_test)
+head(chi_data)
+
+chi_data[,c("Chr", "bp")] <- matrix(unlist(strsplit(chi_data$Marker, "_")), byrow = TRUE, ncol = 2)
+
+colnames(chi_data)[c(3,4)] <- c("Chi", "P")
+chi_data$bp <- as.numeric(chi_data$bp)
+
+chi_data %>% 
+  mutate(Distorted = ifelse(chi_data$P < 0.05/nrow(chi_data), "Yes", "No")) %>%
+  filter(Chr != "Chr00") %>%
+  ggplot() +
+  geom_point(aes(x = bp/1000000, y = -log10(P), color = Distorted), shape = 1, size = 0.5, alpha = 0.5) +
+  scale_color_manual(values = c("darkgrey", "red")) +
+  geom_abline(intercept = -log10(0.05/nrow(chi_data)), slope = 0, linewidth = 0.2, color = "red") +
+  facet_wrap(Chr ~ ., ncol = 3, strip.position = "right") + 
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40)) +
+  labs(y = expression(-"log"[10](italic("P"))), x = "Genome position (Mbp)") +
+  theme_bw() + 
+  theme(legend.position = "bottom")
+
+ggsave("segr_test_chr.pdf", width = 7, height = 5)
+```
+
+### Recombination frequency computation
+
+Compute two-point recombination frequencies:
+
+```{r}
+twopts <- rf_2pts(input.obj = vcf_filtered)
+save(twopts, file = "twopts.RData")
+
+load("twopts.RData")
+```
+
+Filter `length(no_dist)` non-distorted markers:
+
+```{r}
+mark_no_dist <- make_seq(twopts, c(no_dist))
+```
+
+Visualize recombination frequency matrix for `length(mark_no_dist$seq.num)` markers:
+
+```{r, fig.width = 15, fig.height = 15, dpi = 400}
+rf_graph_table(mark_no_dist, main = paste(length(mark_no_dist$seq.num), "markers"), mrk.axis = "none")
+```
+
+### Grouping
+
+#### Genome-based grouping
+
+Group according to genome information:
+
+```{r}
+chr_map <- vector("list", 16)
+
+names(chr_map) <- paste0("Chr", sprintf("%02d", (1:16)-1))
+for(c in 1:16) {
+  chr_map[[c]] <- make_seq(twopts, paste0("Chr", sprintf("%02d", c-1)))
+  chr_map[[c]] <- onemap::map(chr_map[[c]], global_error = 0.15, tol = 1e-03)
+  if(c > 1) {
+    chr_map[[c]]$data.name <- NA
+    chr_map[[c]]$twopt <- NA
+  }
+}
+
+save(chr_map, file = "chr_map.RData")
+```
+
+Visualize heatmaps:
+
+```{r, echo=-1}
+load("chr_map.RData")
+for(c in 2:16) {
+  chr_map[[c]]$data.name <- chr_map[[1]]$data.name
+  chr_map[[c]]$twopt <- chr_map[[1]]$twopt
+}
+
+for(c in 2:16) {
+  print(paste0("Chr", sprintf("%02d", c-1)))
+  print(chr_map[[c]])
+  which_chr <- table(chr_map[[c]]$data.name$CHROM[chr_map[[c]]$seq.num])
+  which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); print(which_chr)
+  print(rf_graph_table(chr_map[[c]], main = which_chr, mrk.axis = "none"))
+}
+```
+
+Visualize maps:
+
+```{r}
+draw_map(chr_map, names = FALSE, grid = FALSE, cex.mrk = 0.7)
+```
+
+Linkage groups *versus* chromosomes:
+
+```{r}
+lgs_vs_chr <- data.frame(row.names = c("ID", "Chr", "bp", "Lgr", "cM"))
+for(c in 2:16) {
+  ID <- chr_map[[c]]$seq.num
+  Chr <- chr_map[[c]]$data.name$CHROM[chr_map[[c]]$seq.num]
+  bp <- chr_map[[c]]$data.name$POS[chr_map[[c]]$seq.num]
+  Lgr <- rep(names(chr_map)[c], length(chr_map[[c]]$seq.num))
+  cM <- c(0, cumsum(kosambi(chr_map[[c]]$seq.rf)))
+  lgs_vs_chr <- rbind(lgs_vs_chr, data.frame(ID, Chr, bp, Lgr, cM))
+}
+
+head(lgs_vs_chr)
+```
+
+```{r, fig.height = 8, fig.width = 13}
+ggplot(lgs_vs_chr) +
+  geom_point(aes(x = cM, y = bp/1000000, color = Chr), shape = 1, alpha = 0.5) + 
+  facet_grid(Chr ~ Lgr, scales = "free", space = "free") + 
+  scale_x_continuous(breaks = seq(0, round(max(lgs_vs_chr$cM), digits = -2), by = round(max(lgs_vs_chr$cM), digits = -2)/5)) +
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40)) +
+  labs(x = "Map position (cM)", y = "Genome position (Mbp)") +
+  theme_bw() + 
+  theme(panel.spacing=unit(0, "lines"), 
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggsave("lgs_vs_chr_genome.pdf", height = 15, width = 30)
+```
+
+Map summary:
+
+```{r, echo = -(13:14)}
+map_summary <- data.frame(row.names = c("Chr", "N.mrk", "N.distorted", "N.nondistorted", "Lenght", "Max.gap"))
+
+for(c in 1:15) {
+  Chr <- sprintf("%02d", c)
+  N.mrk <- length(chr_map[[c]]$seq.num)
+  Length <- tail(cumsum(kosambi(chr_map[[c]]$seq.rf)), 1)
+  N.distorted <- sum(!chr_map[[c]]$seq.num %in% no_dist)
+  N.nondistorted <- sum(chr_map[[c]]$seq.num %in% no_dist)
+  Max.gap <- max(kosambi(chr_map[[c]]$seq.rf))
+  map_summary <- rbind(map_summary, data.frame(Chr, N.mrk, Length = round(Length, 2), N.distorted, N.nondistorted, Max.gap = round(Max.gap, 2)))
+}
+
+map_summary <- rbind(map_summary, data.frame(Chr = "Total", N.mrk = sum(map_summary$N.mrk), 
+                                             N.distorted = sum(map_summary$N.distorted), 
+                                             N.nondistorted = sum(map_summary$N.nondistorted), 
+                                             Length = sum(map_summary$Length),
+                                             Max.gap = sum(map_summary$Max.gap)))
+
+knitr::kable(map_summary)
+
+rm(chr_map)
+gc()
+```
+
+#### *De novo* grouping based on UPGMA
+
+Group according to recombination frequency estimates (*de novo*) using UPGMA method:
+
+```{r, eval = -(1:4), echo = -5, fig.width = 8, dpi = 400}
+lgs <- group_upgma(mark_no_dist, expected.groups = 16, inter = FALSE, comp.mat = TRUE)
+
+lgs$groups[lgs$groups == 2] <- 1
+lgs$groups <- ifelse(test = lgs$groups>1, yes = lgs$groups-1, no = lgs$groups)
+
+save(lgs, file = "lgs_upgma.RData")
+
+load("lgs_upgma.RData")
+
+lgs$seq.vs.grouped.snp
+sort(table(lgs$groups))
+plot(lgs)
+lgs$n.groups <- length(table(lgs$groups))
+```
+
+```{r, eval = FALSE}
+lgs_map <- only_main_chr <- markers_to_try <- vector("list", lgs$n.groups)
+
+names(lgs_map) <- names(only_main_chr) <- names(markers_to_try) <- paste0("Lgr", sprintf("%02d", 1:lgs$n.groups))
+
+for(c in 1:lgs$n.groups) {
+  print(paste0("Lgr", sprintf("%02d", c)))
+  lgs_map[[c]] <- make_seq(lgs, c)
+  temp_chrom <- lgs_map[[c]]$data.name$CHROM[lgs_map[[c]]$seq.num]
+  only_main_chr[[c]] <- lgs_map[[c]]$seq.num[which(temp_chrom == names(which.max(table(temp_chrom))))]
+  markers_to_try[[c]] <- lgs_map[[c]]$seq.num[which(temp_chrom != names(which.max(table(temp_chrom))))]
+  lgs_map[[c]] <- make_seq(lgs$twopt, sort(only_main_chr[[c]]))
+  lgs_map[[c]] <- onemap::map(lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+  if(c > 1) {
+    lgs_map[[c]]$data.name <- NA
+    lgs_map[[c]]$twopt <- NA
+  } 
+}
+
+save(lgs_map, file = "lgs_map_upgma.RData")
+save(only_main_chr, markers_to_try, file = "markers_upgma.RData")
+```
+
+Visualize heatmaps:
+
+```{r, echo = -(1:2)}
+load("lgs_map_upgma.RData")
+load("markers_upgma.RData")
+for(c in 2:15) {
+  lgs_map[[c]]$data.name <- lgs_map[[1]]$data.name
+  lgs_map[[c]]$twopt <- lgs_map[[1]]$twopt
+}
+
+for(c in 1:15) {
+  print(paste0("Lgr", sprintf("%02d", c)))
+  print(lgs_map[[c]])
+  which_chr <- table(lgs_map[[c]]$data.name$CHROM[lgs_map[[c]]$seq.num])
+  which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", ")
+  print(rf_graph_table(lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none"))
+}
+```
+
+Visualize maps:
+
+```{r}
+draw_map(lgs_map, names = FALSE, grid = FALSE, cex.mrk = 0.7)
+```
+
+Linkage groups *versus* chromosomes:
+
+```{r}
+lgs_vs_chr <- data.frame(row.names = c("ID", "Chr", "bp", "Lgr", "cM"))
+
+for(c in 1:lgs$n.groups) {
+  ID <- lgs_map[[c]]$seq.num
+  Chr <- lgs_map[[c]]$data.name$CHROM[lgs_map[[c]]$seq.num]
+  bp <- lgs_map[[c]]$data.name$POS[lgs_map[[c]]$seq.num]
+  Lgr <- rep(names(lgs_map)[c], length(lgs_map[[c]]$seq.num))
+  cM <- c(0, cumsum(kosambi(lgs_map[[c]]$seq.rf)))
+  lgs_vs_chr <- rbind(lgs_vs_chr, data.frame(ID, Chr, bp, Lgr, cM))
+}
+
+head(lgs_vs_chr)
+```
+
+```{r, fig.height = 8, fig.width = 13}
+ggplot(lgs_vs_chr) +
+  geom_point(aes(x = cM, y = bp/1000000, color = Chr), shape = 1, alpha = 0.5) + 
+  facet_grid(Chr ~ Lgr, scales = "free", space = "free") + 
+  scale_x_continuous(breaks = seq(0, round(max(lgs_vs_chr$cM), digits = -2), by = round(max(lgs_vs_chr$cM), digits = -2)/5)) +
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40)) +
+  labs(x = "Map position (cM)", y = "Genome position (Mbp)") +
+  theme_bw() + 
+  theme(panel.spacing=unit(0, "lines"), 
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggsave("lgs_vs_chr_upgma.pdf", height = 8, width = 13)
+```
+
+Map summary:
+
+```{r}
+map_summary <- data.frame(row.names = c("Lgr", "Chr", "N.mrk", "Lenght", "Max.gap"))
+
+all_Chr <- c()
+
+for(c in 1:lgs$n.groups) {
+  Lgr <- sprintf("%02d", c)
+  which_mrk <- lgs_map[[c]]$data.name$CHROM[lgs_map[[c]]$seq.num]
+  all_Chr <- c(all_Chr, which_mrk)
+  Chr <- paste(names(table(which_mrk)), table(which_mrk), sep = "=", collapse = ", ")
+  N.mrk <- length(lgs_map[[c]]$seq.num)
+  Length <- tail(cumsum(kosambi(lgs_map[[c]]$seq.rf)), 1)
+  Max.gap <- max(kosambi(lgs_map[[c]]$seq.rf))
+  map_summary <- rbind(map_summary, data.frame(Lgr, Chr, N.mrk, Length = round(Length, 2), Max.gap = round(Max.gap, 2)))
+}
+
+all_Chr <- paste(names(table(all_Chr)), table(all_Chr), sep = "=", collapse = ", ")
+
+map_summary <- rbind(map_summary, data.frame(Lgr = "Total", Chr = all_Chr, 
+                                             N.mrk = sum(map_summary$N.mrk), 
+                                             Length = sum(map_summary$Length),
+                                             Max.gap = sum(map_summary$Max.gap)))
+
+knitr::kable(map_summary)
+```
+
+#### Split groups based on gaps
+
+Estimate number of expected groups based on gaps from genome information:
+
+```{r}
+gap <- 5 #gap size that split chr
+gr <- 0
+groups <- c()
+
+for(c in 1:lgs$n.groups) {
+  mrk_gap <- 0
+  temp.groups <- c()
+  temp.gap <- which(kosambi(lgs_map[[c]]$seq.rf) > gap)
+  if(length(temp.gap) > 0) {
+    mrk_gap <- c(mrk_gap, temp.gap)
+  } 
+  
+  mrk_gap <- c(mrk_gap, length(lgs_map[[c]]$seq.num))
+  for(m in 1:(length(mrk_gap)-1)) {
+    gr <- gr + 1
+    temp.groups <- c(temp.groups, rep(gr, mrk_gap[m+1]-mrk_gap[m]))
+  }
+  
+  attr(temp.groups, "names") <- as.character(lgs_map[[c]]$seq.num)
+  groups <- c(groups, temp.groups)
+}
+
+table(groups)
+```
+
+We replace the `lgs` object info with the one from gap-assisted grouping:
+
+```{r}
+lgs$n.groups <- length(table(groups))
+no.groups <- lgs$seq.num[!lgs$seq.num %in% sort(as.numeric(names(groups)))]
+na.groups <- rep(NA, length(no.groups))
+attr(na.groups, "names") <- as.character(no.groups)
+
+groups <- c(na.groups, groups)
+groups <- groups[order(as.numeric(names(groups)))]
+lgs$groups <- groups
+
+count_chr <- lgs_map <- vector("list", lgs$n.groups)
+names(lgs_map) <- paste0("Lgr", sprintf("%02d", 1:lgs$n.groups))
+n_min <- 2 #minimum number of markers per group
+first_chr <- c()
+
+for(c in 1:lgs$n.groups) {
+  print(paste0("Lgr", sprintf("%02d", c)))
+  lgs_map[[c]] <- make_seq(lgs, c)
+  count_chr[[c]] <- table(lgs_map[[c]]$data.name$CHROM[lgs_map[[c]]$seq.num])
+  if(length(lgs_map[[c]]$seq.num) >= n_min) { 
+    if(length(first_chr) == 0) first_chr <- c
+    lgs_map[[c]] <- onemap::map(lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+  } 
+  if(c > first_chr) {
+    lgs_map[[c]]$data.name <- NA
+    lgs_map[[c]]$twopt <- NA
+  }
+}
+
+unlist(count_chr)
+
+save(lgs, file = "lgs_gaps.RData")
+save(lgs_map, file = "lgs_map_gaps.RData")
+```
+
+Visualize heatmaps:
+
+```{r, echo = -(1:2)}
+load("lgs_gaps.RData")
+load("lgs_map_gaps.RData")
+
+which(sapply(lgs_map, is.null) == FALSE) 
+first_chr <- which(sapply(lgs_map, is.null) == FALSE)[1]
+for(c in 1:length(lgs_map)) {
+  lgs_map[[c]]$data.name <- lgs_map[[first_chr]]$data.name
+  lgs_map[[c]]$twopt <- lgs_map[[first_chr]]$twopt
+}
+
+estimated <- c()
+for(c in 1:length(lgs_map)) {
+  if(length(lgs_map[[c]]$seq.phases) > 1){
+    print(paste0("Lgr", sprintf("%02d", c)))
+    estimated <- c(estimated, c)
+    print(lgs_map[[c]])
+    which_chr <- table(lgs_map[[c]]$data.name$CHROM[lgs_map[[c]]$seq.num])
+    which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", ")
+    print(rf_graph_table(lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none"))
+  }
+}
+```
+
+Visualize maps:
+
+```{r}
+draw_map(lgs_map[estimated], names = FALSE, grid = FALSE, cex.mrk = 0.7)
+```
+
+Linkage groups *versus* chromosomes:
+
+```{r}
+lgs_vs_chr <- data.frame(row.names = c("ID", "Chr", "bp", "Lgr", "cM")) 
+
+for(c in estimated) {
+  ID <- lgs_map[[c]]$seq.num
+  Chr <- lgs_map[[c]]$data.name$CHROM[lgs_map[[c]]$seq.num]
+  bp <- lgs_map[[c]]$data.name$POS[lgs_map[[c]]$seq.num]
+  Lgr <- rep(names(lgs_map)[c], length(lgs_map[[c]]$seq.num))
+  cM <- c(0, cumsum(kosambi(lgs_map[[c]]$seq.rf)))
+  lgs_vs_chr <- rbind(lgs_vs_chr, data.frame(ID, Chr, bp, Lgr, cM))
+}
+
+head(lgs_vs_chr)
+```
+
+```{r, fig.height = 8, fig.width = 13}
+ggplot(lgs_vs_chr) + 
+  geom_point(aes(x = cM, y = bp/1000000, color = Chr), shape = 1, alpha = 0.5) + 
+  facet_grid(Chr ~ Lgr, scales = "free", space = "free") + 
+  scale_x_continuous(breaks = seq(0, round(max(lgs_vs_chr$cM), digits = -2), by = round(max(lgs_vs_chr$cM), digits = -2)/5)) +
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40)) +
+  labs(x = "Map position (cM)", y = "Genome position (Mbp)") +
+  theme_bw() + 
+  theme(panel.spacing = unit(0, "lines"), 
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggsave("lgs_vs_chr_gaps.pdf", height = 8, width = 13)
+```
+
+Map summary:
+
+```{r}
+map_summary <- data.frame(row.names = c("Lgr", "Chr", "N.mrk", "Lenght", "Max.gap")) 
+
+all_Chr <- c()
+
+for(c in estimated) {
+  Lgr <- sprintf("%02d", c)
+  which_mrk <- lgs_map[[c]]$data.name$CHROM[lgs_map[[c]]$seq.num]
+  all_Chr <- c(all_Chr, which_mrk)
+  Chr <- paste(names(table(which_mrk)), table(which_mrk), sep = "=", collapse = ", ")
+  N.mrk <- length(lgs_map[[c]]$seq.num)
+  Length <- tail(cumsum(kosambi(lgs_map[[c]]$seq.rf)), 1)
+  Max.gap <- max(kosambi(lgs_map[[c]]$seq.rf))
+  map_summary <- rbind(map_summary, data.frame(Lgr, Chr, N.mrk, Length = round(Length, 2), Max.gap = round(Max.gap, 2)))
+  map_summary <- rbind(map_summary, data.frame(Lgr, Chr, N.mrk, Length = 0, Max.gap = 0))
+}
+
+all_Chr <- paste(names(table(all_Chr)), table(all_Chr), sep = "=", collapse = ", ")
+
+map_summary <- rbind(map_summary, data.frame(Lgr = "Total", Chr = all_Chr, 
+                                             N.mrk = sum(map_summary$N.mrk), 
+                                             Length = sum(map_summary$Length),
+                                             Max.gap = sum(map_summary$Max.gap)))
+
+map_summary <- rbind(map_summary, data.frame(Lgr = "Total", Chr = all_Chr, 
+                                             N.mrk = sum(map_summary$N.mrk), 
+                                             Length = 0, Max.gap = 0))
+
+knitr::kable(map_summary)
+```
+
+#### Combine genome-based and recombination frequency-based information
+
+As we identified misassemblies in the genome-based map, it's time to reorder them:
+
+```{r, eval = FALSE}
+chr_lgs_map <- vector("list", 15)
+names(chr_lgs_map) <- paste0("Lgr", sprintf("%02d", 1:15))
+unlist(count_chr)
+```
+
+```{r, eval = FALSE}
+c <- 1
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[1]]$seq.num, lgs_map[[3]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 2
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[7]]$seq.num, rev(lgs_map[[6]]$seq.num)))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 3
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[8]]$seq.num, rev(lgs_map[[9]]$seq.num)))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 4
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[11]]$seq.num, lgs_map[[12]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 5
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[13]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 6
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[15]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 7
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[18]]$seq.num, rev(lgs_map[[20]]$seq.num), lgs_map[[19]]$seq.num[1:23], lgs_map[[21]]$seq.num, lgs_map[[22]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 8
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[25]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 9
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[14]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 10
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[17]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 11
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[4]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 12
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[27]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 13
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[5]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 14
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[26]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+```{r, eval = FALSE}
+c <- 15
+
+chr_lgs_map[[c]] <- make_seq(lgs_map[[c]]$twopt, c(lgs_map[[28]]$seq.num, lgs_map[[30]]$seq.num))
+chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", "); which_chr
+
+rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none")
+chr_lgs_map[[c]]
+```
+
+Saving new linkage groups:
+
+```{r, eval = FALSE}
+for(c in 2:15) {
+  chr_lgs_map[[c]]$data.name <- NA
+  chr_lgs_map[[c]]$twopt <- NA
+}
+
+save(chr_lgs_map, file = "chr_lgs_map_fixed.RData")
+```
+
+Visualize heatmaps::
+
+```{r, echo = -1}
+load("chr_lgs_map_fixed.RData")
+for(c in 2:15) {
+  chr_lgs_map[[c]]$data.name <- chr_lgs_map[[1]]$data.name
+  chr_lgs_map[[c]]$twopt <- chr_lgs_map[[1]]$twopt
+}
+
+for(c in 1:15) {
+  print(paste0("Lgr", sprintf("%02d", c)))
+  print(chr_lgs_map[[c]])
+  which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+  which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", ")
+  print(rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none"))
+}
+```
+
+Visualize maps:
+
+```{r}
+draw_map(chr_lgs_map, names = FALSE, grid = FALSE, cex.mrk = 0.7)
+```
+
+Linkage groups *versus* chromosomes:
+
+```{r}
+lgs_vs_chr <- data.frame(row.names = c("ID", "Chr", "bp", "Lgr", "cM"))
+
+for(c in 1:15) {
+  ID <- chr_lgs_map[[c]]$seq.num
+  Chr <- chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num]
+  bp <- chr_lgs_map[[c]]$data.name$POS[chr_lgs_map[[c]]$seq.num]
+  Lgr <- rep(names(chr_lgs_map)[c], length(chr_lgs_map[[c]]$seq.num))
+  cM <- c(0, cumsum(kosambi(chr_lgs_map[[c]]$seq.rf)))
+  lgs_vs_chr <- rbind(lgs_vs_chr, data.frame(ID, Chr, bp, Lgr, cM))
+}
+
+head(lgs_vs_chr)
+```
+
+```{r, fig.height = 8, fig.width = 13}
+ggplot(lgs_vs_chr) +
+  geom_point(aes(x = cM, y = bp/1000000, color = Chr), shape = 1, alpha = 0.5) + 
+  facet_grid(Chr ~ Lgr, scales = "free", space = "free") + 
+  scale_x_continuous(breaks = seq(0, round(max(lgs_vs_chr$cM), digits = -2), by = round(max(lgs_vs_chr$cM), digits = -2)/5)) +
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40)) +
+  labs(x = "Map position (cM)", y = "Genome position (Mbp)") +
+  theme_bw() + 
+  theme(panel.spacing=unit(0, "lines"), 
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggsave("lgs_vs_chr_fixed.pdf", height = 8, width = 13)
+```
+
+Map summary:
+
+```{r}
+map_summary <- data.frame(row.names = c("Lgr", "Chr", "N.mrk", "Lenght", "Max.gap"))
+
+Chrtotal <- c()
+
+for(c in 1:15) {
+  Lgr <- sprintf("%02d", c)
+  which_mrk <- chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num]
+  Chrtotal <- c(Chrtotal, which_mrk)
+  Chr <- paste(names(table(which_mrk)), table(which_mrk), sep = "=", collapse = ", ")
+  N.mrk <- length(chr_lgs_map[[c]]$seq.num)
+  Length <- tail(cumsum(kosambi(chr_lgs_map[[c]]$seq.rf)), 1)
+  Max.gap <- max(kosambi(chr_lgs_map[[c]]$seq.rf))
+  map_summary <- rbind(map_summary, data.frame(Lgr, Chr, N.mrk, Length = round(Length, 2), Max.gap = round(Max.gap, 2)))
+}
+
+Chrtotal <- paste(names(table(Chrtotal)), table(Chrtotal), sep = "=", collapse = ", ")
+
+map_summary <- rbind(map_summary, data.frame(Lgr = "Total", Chr = Chrtotal, 
+                                             N.mrk = sum(map_summary$N.mrk), 
+                                             Length = sum(map_summary$Length),
+                                             Max.gap = sum(map_summary$Max.gap)))
+
+knitr::kable(map_summary)
+```
+
+#### Try markers
+
+Some groups have markers originally assigned to other chromosomes detected using UPGMA. The markers from the same chromosome that were not added in the previous step are also tried here. We try best positions for them:
+
+```{r}
+markers_to_try <- markers_to_try[c(1,5,6,7,8,9,11,12,3,10,2,14,4,13,15)]
+names(markers_to_try) <- paste0("Lgr", sprintf("%02d", 1:15))
+markers_to_try
+
+markers_to_try[[1]] <- c(markers_to_try[[1]], lgs_map[[2]]$seq.num)
+markers_to_try[[4]] <- c(markers_to_try[[4]], lgs_map[[10]]$seq.num)
+markers_to_try[[6]] <- c(markers_to_try[[6]], lgs_map[[16]]$seq.num)
+markers_to_try[[7]] <- c(markers_to_try[[7]], lgs_map[[19]]$seq.num[24:26])
+markers_to_try[[8]] <- c(markers_to_try[[8]], lgs_map[[23]]$seq.num, lgs_map[[24]]$seq.num)
+
+markers_to_try[[15]] <- c(markers_to_try[[15]], lgs_map[[29]]$seq.num)
+fix_lgs <- which(sapply(markers_to_try, length) > 0)
+fix_lgs
+
+markers_to_try
+```
+
+Fixing linkage groups:
+
+```{r, eval = FALSE}
+for (c in fix_lgs) {
+  print(paste0("Chr", sprintf("%02d", c)))
+  try_res <- vector("list", length = length(markers_to_try[[c]]))
+  for(m in 1:length(markers_to_try[[c]])) {
+    print(paste("Try", markers_to_try[[c]][m]))
+    try_temp <- try_seq(chr_lgs_map[[c]], markers_to_try[[c]][m])
+    if(which.max(try_temp$LOD) %in% c(1,length(try_temp$LOD))) {
+      try_res[m] <- list(NULL)
+    } else {
+      try_res[[m]] <- try_temp$try.ord[which.max(try_temp$LOD),]
+    }
+  }
+  try_res <- try_res[!sapply(try_res, is.null)]
+  if(length(try_res) > 0) {
+    chr_lgs_map[[c]] <- make_seq(chr_lgs_map[[c]]$twopt, unique(c(t(sapply(try_res, cbind)))))
+    chr_lgs_map[[c]] <- onemap::map(chr_lgs_map[[c]], global_error = 0.15, tol = 1e-03)
+  } 
+}
+
+for(c in 2:15) {
+  chr_lgs_map[[c]]$data.name <- NA
+  chr_lgs_map[[c]]$twopt <- NA
+}
+
+save(chr_lgs_map, file = "chr_lgs_map_try.RData")
+```
+
+Visualize heatmaps:
+
+```{r, echo = -1}
+load("chr_lgs_map_try.RData")
+for(c in 2:15) {
+  chr_lgs_map[[c]]$data.name <- chr_lgs_map[[1]]$data.name
+  chr_lgs_map[[c]]$twopt <- chr_lgs_map[[1]]$twopt
+}
+
+for(c in 1:15) {
+  print(paste0("Lgr", sprintf("%02d", c)))
+  print(chr_lgs_map[[c]])
+  which_chr <- table(chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num])
+  which_chr <- paste(names(which_chr), which_chr, sep = "=", collapse = ", ")
+  print(rf_graph_table(chr_lgs_map[[c]], main = paste0("Lgr", sprintf("%02d", c), " (", which_chr, ")"), mrk.axis = "none"))
+}
+```
+
+Visualize maps:
+
+```{r}
+draw_map(chr_lgs_map, names = FALSE, grid = FALSE, cex.mrk = 0.7)
+```
+
+Linkage groups *versus* chromosomes:
+
+```{r}
+lgs_vs_chr <- data.frame(row.names = c("ID", "Chr", "bp", "Lgr", "cM"))
+
+for(c in 1:15) {
+  ID <- chr_lgs_map[[c]]$seq.num
+  Chr <- chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num]
+  bp <- chr_lgs_map[[c]]$data.name$POS[chr_lgs_map[[c]]$seq.num]
+  Lgr <- rep(names(chr_lgs_map)[c], length(chr_lgs_map[[c]]$seq.num))
+  cM <- c(0, cumsum(kosambi(chr_lgs_map[[c]]$seq.rf)))
+  lgs_vs_chr <- rbind(lgs_vs_chr, data.frame(ID, Chr, bp, Lgr, cM))
+}
+
+head(lgs_vs_chr)
+```
+
+```{r, fig.height = 8, fig.width = 13}
+ggplot(lgs_vs_chr) +
+  geom_point(aes(x = cM, y = bp/1000000, color = Chr), shape = 1, alpha = 0.5) + 
+  facet_grid(Chr ~ Lgr, scales = "free", space = "free") + 
+  scale_x_continuous(breaks = seq(0, round(max(lgs_vs_chr$cM), digits = -2), by = round(max(lgs_vs_chr$cM), digits = -2)/5)) +
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40, 50)) +
+  labs(x = "Map position (cM)", y = "Genome position (Mbp)") +
+  theme_bw() + 
+  theme(panel.spacing=unit(0, "lines"), 
+        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+ggsave("lgs_vs_chr_try.pdf", height = 8, width = 13)
+```
+
+Map summary:
+
+```{r}
+map_summary <- data.frame(row.names = c("Lgr", "Chr", "N.mrk", "Lenght", "Max.gap"))
+Chrtotal <- c()
+
+for(c in 1:15) {
+  Lgr <- sprintf("%02d", c)
+  which_mrk <- chr_lgs_map[[c]]$data.name$CHROM[chr_lgs_map[[c]]$seq.num]
+  Chrtotal <- c(Chrtotal, which_mrk)
+  Chr <- paste(names(table(which_mrk)), table(which_mrk), sep = "=", collapse = ", ")
+  N.mrk <- length(chr_lgs_map[[c]]$seq.num)
+  Length <- tail(cumsum(kosambi(chr_lgs_map[[c]]$seq.rf)), 1)
+  Max.gap <- max(kosambi(chr_lgs_map[[c]]$seq.rf))
+  map_summary <- rbind(map_summary, data.frame(Lgr, Chr, N.mrk, Length = round(Length, 2), Max.gap = round(Max.gap, 2)))
+}
+
+Chrtotal <- paste(names(table(Chrtotal)), table(Chrtotal), 
+                  sep = "=", collapse = ", ")
+
+map_summary <- rbind(map_summary, data.frame(Lgr = "Total", Chr = Chrtotal, 
+                                             N.mrk = sum(map_summary$N.mrk), 
+                                             Length = sum(map_summary$Length),
+                                             Max.gap = sum(map_summary$Max.gap)))
+
+knitr::kable(map_summary)
+```
+
+## QTL analysis
+
+Required packages:
+```{r}
+library(onemap)
+library(tidyverse)
+library(tidyr)
+library(fullsibQTL)
+library(ggplot2)
+```
+
+```{r}
+load("blup.list.RData")
+
+blups16 <- data.frame(blup.list$LEAFSHAP1$pvals$predicted.value,
+                      blup.list$LEAFSHAP2$pvals$predicted.value,
+                      blup.list$LEAFSHAP3$pvals$predicted.value,
+                      blup.list$LEAFSHAP4$pvals$predicted.value,
+                      blup.list$LEFTPP_TP1$pvals$predicted.value,
+                      blup.list$LEFTPP_TP2$pvals$predicted.value,
+                      blup.list$LEFTPP_TP3$pvals$predicted.value,
+                      blup.list$PLANTH_TP1$pvals$predicted.value,
+                      blup.list$PLANTH_TP2$pvals$predicted.value,
+                      blup.list$VINDIA$pvals$predicted.value,
+                      blup.list$LA$pvals$predicted.value)
+
+colnames(blups16) <- c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4","LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3","PLANTH_TP1","PLANTH_TP2","VINDIA","LA")
+
+rownames(blups16) <- blup.list$LEAFSHAP1$pvals$geno
+
+write.csv(blups16, file = "pheno16.csv", row.names = TRUE)
+```
+
+```{r}
+#load("blup.modelo.list.RData")
+
+#blups17 <- data.frame(blup.modelo.list$SRDW$pvals$predicted.value,
+#                      blup.modelo.list$SRFW$pvals$predicted.value,
+#                      blup.modelo.list$VDW$pvals$predicted.value,
+#                      blup.modelo.list$VFW$pvals$predicted.value,
+#                      blup.modelo.list$LFSIZE1$pvals$predicted.value,
+#                      blup.modelo.list$LFSIZE2$pvals$predicted.value,
+#                      blup.modelo.list$PETIOL1$pvals$predicted.value,
+#                      blup.modelo.list$PETIOL2$pvals$predicted.value,
+#                      blup.modelo.list$LAI$pvals$predicted.value,
+#                      blup.modelo.list$NOPH$pvals$predicted.value,
+#                      blup.modelo.list$VFW.plant$pvals$predicted.value,
+#                      blup.modelo.list$VDW.plant$pvals$predicted.value,
+#                      blup.modelo.list$VFW_sab$pvals$predicted.value,
+#                      blup.modelo.list$VDW_sam$pvals$predicted.value,
+#                      blup.modelo.list$SRFW_sam$pvals$predicted.value,
+#                      blup.modelo.list$SRDW_sam$pvals$predicted.value,
+#                      blup.modelo.list$SRFW.plant$pvals$predicted.value,
+#                      blup.modelo.list$SRDW.plant$pvals$predicted.value,
+#                      blup.modelo.list$NOSR$pvals$predicted.value,
+#                      blup.modelo.list$NOSR.plant$pvals$predicted.value,
+#                      blup.modelo.list$PTRN$pvals$predicted.value,
+#                      blup.modelo.list$PTRN.plant$pvals$predicted.value,
+#                      blup.modelo.list$PTRFW$pvals$predicted.value,
+#                      blup.modelo.list$PTRFW.plant$pvals$predicted.value)
+
+#colnames(blups17) <- c("SRDW","SRFW","VDW","VFW","LFSIZE1","LFSIZE2","PETIOL1","PETIOL2","LAI","NOPH","VFW.plant","VDW.plant","VFW_sab","VDW_sam","SRFW_sam","SRDW_sam","SRFW.plant","SRDW.plant","NOSR","NOSR.plant","PTRN","PTRN.plant","PTRFW","PTRFW.plant")
+                       
+#rownames(blups17) <- blup.modelo.list$SRDW$pvals$geno
+            
+#write.csv(blups17, file = "pheno17.csv", row.names = TRUE)
+```
+
+Plot - boxplot and violin:
+
+```{r}
+box16 <- data.frame(blup.list$LEAFSHAP1$pvals$predicted.value,
+                    blup.list$LEAFSHAP2$pvals$predicted.value,
+                    blup.list$LEAFSHAP3$pvals$predicted.value,
+                    blup.list$LEAFSHAP4$pvals$predicted.value,
+                    blup.list$LEFTPP_TP1$pvals$predicted.value,
+                    blup.list$LEFTPP_TP2$pvals$predicted.value,
+                    blup.list$LEFTPP_TP3$pvals$predicted.value,
+                    blup.list$PLANTH_TP1$pvals$predicted.value,
+                    blup.list$PLANTH_TP2$pvals$predicted.value,
+                    blup.list$VINDIA$pvals$predicted.value,
+                    blup.list$LA$pvals$predicted.value)
+
+colnames(box16) <- c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4","LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3","PLANTH_TP1","PLANTH_TP2","VINDIA","LA")
+
+box16$geno <- blup.list$LEAFSHAP1$pvals$geno
+
+year <- c("2016")
+blups16$Year <- year
+```
+
+```{r}
+box16_long <- box16 %>% pivot_longer(cols = c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4","LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3","PLANTH_TP1","PLANTH_TP2","VINDIA","LA"), names_to = "Phenotype", values_to = "Value")
+
+box16_long$Year <- "2016"
+
+box16_long$Phenotype <- factor(box16_long$Phenotype, levels = unique(box16_long$Phenotype))
+box16_long$geno <- gsub("CIP107665.19", "M19", box16_long$geno)
+box16_long$geno <- gsub("CIP107665.9", "M9", box16_long$geno)
+head(box16_long)
+```
+
+```{r}
+ggplot(box16_long, aes(x = Year, y = Value)) + 
+  geom_violin(aes(group = Year), color = "salmon") + 
+  geom_point(data = box16_long %>% filter(geno %in% c("M19", "M9")), 
+             aes(shape = geno), 
+             color = "black", alpha = 0.7, size = 1, stroke = 1.5) + 
+  scale_shape_manual(values = c(3,4)) + 
+  facet_wrap(. ~ Phenotype, scales = "free_y", nrow = 3) + 
+  labs(y = "Predict Value", shape = "Parent") + 
+  theme_bw() + 
+  theme(axis.title.x = element_blank(), 
+        axis.text.x = element_blank(), 
+        axis.ticks.x = element_blank(), 
+        legend.position = "right", 
+        legend.title = element_text(size = 12), 
+        legend.text = element_text(size = 10))
+
+ggsave("violin.png", width = 8, height = 6, units = "in", dpi = 300)
+```
+
+### Reading data and filtering
+
+```{r}
+inds <- scan("vcf_filtered.raw", what = "character", skip = 2, nlines = 1)
+inds
+```
+
+BLUPs:
+
+```{r}
+pheno16 <- read.csv("pheno16.csv", header = TRUE, row.names = 1)
+colnames(pheno16) <- paste(colnames(pheno16), "2016", sep = "_")
+
+for(p in 1:ncol(pheno16)) {
+  write.table(paste(paste0("*", colnames(pheno16)[p]), 
+                    paste(pheno16[inds, p], collapse = " "), collapse = "\n", sep = " "), 
+              file = "vcf_filtered.raw", row.names = FALSE, 
+              col.names = FALSE, quote = FALSE, append = TRUE)
+}
+
+#pheno17 <- read.csv("pheno17.csv", header = TRUE, row.names = 1)
+#colnames(pheno17) <- paste(colnames(pheno17), "2017", sep = "_")
+#for(p in 1:ncol(pheno17)) {
+#  write.table(paste(paste0("*", colnames(pheno17)[p]), paste(pheno17[inds,p], collapse = " "), collapse = "\n", sep = " "), file = "vcf_filtered.raw", row.names = FALSE, col.names = FALSE, quote = FALSE, append = TRUE)
+#}
+```
+
+Loading map:
+
+```{r, echo = -1}
+load("chr_lgs_map_try.RData")
+for(c in 2:15) {
+  chr_lgs_map[[c]]$data.name <- chr_lgs_map[[1]]$data.name
+  chr_lgs_map[[c]]$twopt <- chr_lgs_map[[1]]$twopt
+}
+```
+
+```{r}
+#Raw data
+fs_data <- read_onemap(inputfile = "vcf_filtered.raw")
+fs_data
+
+#Information of linkage groups, step and mapping function
+fsib <- create_fullsib(fs_data, map.list = chr_lgs_map, step = 1, map.function = "kosambi")
+fsib
+```
+
+### QTL mapping - CIM
+
+#### Cofactors
+
+```{r}
+#`%||%` <- function (x, y) {if (is_null(x)) y else x}
+```
+
+```{r, eval = FALSE}
+cofs_fs <- vector("list", ncol(fsib$pheno))
+pdf("cofs.pdf", width = 16, height = 9)
+for(p in 1:ncol(fsib$pheno)) {
+  print(colnames(fsib$pheno)[p])
+  cofs_fs[[p]] <- cof_selection(fsib, pheno.col = p, k = 2, n.cofactor = 10)
+  print(plot(cofs_fs[[p]], main = colnames(fsib$pheno)[p]))
+}
+dev.off()
+
+for(p in 1:ncol(fsib$pheno)) {
+  cofs_fs[[p]][[1]] <- cofs_fs[[p]][[2]] <- cofs_fs[[p]][[3]] <- cofs_fs[[p]][[4]] <- cofs_fs[[p]][[5]] <- NA
+}
+
+save(cofs_fs, file = "cofs_fs.RData")
+```
+
+```{r}
+load("cofs_fs.RData")
+```
+
+```{r, eval = FALSE}
+for(p in 1:length(cofs_fs)) {
+  cofs <- cofs_fs[[p]][[6]][[1]]
+  cofs_fs[[p]] <- cof_definition(fsib, pheno.col = p, thres.effect = 0.05, cof.pos = cofs)
+}
+```
+
+#### Permutation
+
+```{r, eval = FALSE}
+set.seed(4321)
+
+cofs_perm <- cim_perm <- vector("list", ncol(fsib$pheno))
+
+for(p in 1:ncol(fsib$pheno)) {
+  print(colnames(fsib$pheno)[p])
+  cim_perm[[p]] <- cim_scan(fullsib = cofs_fs[[p]], lg = "all", pheno.col = p, 
+                            LOD = TRUE, n.perm = 1000, ws = 20)
+  print(plot(cim_perm[[p]], main = colnames(fsib$pheno)[p]))
+}
+dev.off()
+
+save(cim_perm, file = "cim_permutations.RData")
+```
+
+```{r}
+load("cim_permutations.RData")
+```
+
+#### Window size = 20
+
+```{r, eval = FALSE}
+cim20 <- vector("list", ncol(fsib$pheno))
+pdf("cim20.pdf", width = 16, height = 9)
+
+for(p in 1:ncol(fsib$pheno)) {
+  print(colnames(fsib$pheno)[p])
+  cim20[[p]] <- cim_scan(fullsib = cofs_fs[[p]], lg = "all", ws = 20, pheno.col = p, LOD = TRUE)
+  print(plot(cim20[[p]], main = colnames(fsib$pheno)[p]))
+}
+
+dev.off()
+
+save(cim20, file = "cim20.RData")
+```
+
+```{r}
+load("cim20.RData")
+```
+
+#### QTL peaks
+
+```{r}
+find_peaks <- function(obj, thr, ws) {
+  nlgs <- length(unique(obj[, "lg"]))
+  peaks <- vector("list", nlgs)
+  peaks1 <- c()
+  for (c in 1:nlgs) {
+    temp0 <- obj[obj[, "lg"] == c, ]
+    if (any(temp0[, "LOD"] > thr)) {
+      temp1 <- temp0[temp0[, "LOD"] > thr, ]
+      if(is.null(dim(temp1))) {
+        peaks0 <- matrix(temp1, nrow = 1, dimnames = list(names(which(temp0[, "LOD"] > thr))))
+      } else {
+        ranges <- c(0, which(diff(temp1[, "pos.cM"]) > ws), nrow(temp1))
+        for (pos in 1:(length(ranges) - 1)) {
+          peaks[[c]] <- c(peaks[[c]], names(which.max(temp1[(ranges[pos] + 1):ranges[pos + 1], "LOD"])))
+        }
+      }
+      peaks0 <- temp0[which(rownames(temp0) %in% peaks[[c]]), ]
+      peaks1 <- rbind(peaks1, peaks0)
+    }
+  }
+  if(!is.null(peaks1)) {
+    rownames(peaks1) <- unlist(peaks) 
+  } else {
+    peaks1 <- NA
+  }
+  return(peaks1)
+}
+
+peaks <- vector("list", ncol(fsib$pheno))
+names(peaks) <- colnames(fsib$pheno)
+
+for(p in c(1:length(peaks))) {
+  if(p == 44) next else peaks[[p]] <- find_peaks(obj = cim20[[p]], thr = summary(cim_perm[[p]], alpha = 0.05, verbose = FALSE)[1, 1], ws = 40)
+}
+
+knitr::kable(do.call(rbind, peaks))
+
+peaks
+```
+
+#### Evaluating QTL phases
+
+```{r, eval = FALSE}
+qtl <- segr <- vector("list", ncol(fsib$pheno))
+names(qtl) <- names(segr) <- colnames(fsib$pheno)
+for(p in c(1:length(qtl))) {
+  cat("p =", p, ", trait =", names(qtl)[p], "\n")
+  if(!is.null(dim(peaks[[p]]))) {
+    qtl[[p]] <- segr[[p]] <- vector("list", nrow(peaks[[p]])) 
+    for(q in 1:nrow(peaks[[p]])){ 
+      qtl[[p]][[q]] <- cim_char(fullsib = cofs_fs[[p]], pheno.col = p, lg = peaks[[p]][q,"lg"], pos = rownames(peaks[[p]])[q])
+      segr[[p]][[q]] <- get_segr(qtl[[p]][[q]])
+    }
+  }
+}
+
+#draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[p]][[q]])
+```
+
+Segregation of each QTL:
+
+```{r, eval = FALSE}
+#LEAFSHAP1
+p <- 16
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[16]][[1]])
+get_segr(qtl[[16]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[16]][[2]])
+get_segr(qtl[[16]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[16]][[3]])
+get_segr(qtl[[16]][[3]])
+
+#LEAFSHAP2
+p <- 17
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[17]][[1]])
+get_segr(qtl[[17]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[17]][[2]])
+get_segr(qtl[[17]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[17]][[3]])
+get_segr(qtl[[17]][[3]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[17]][[4]])
+get_segr(qtl[[17]][[4]])
+
+#LEAFSHAP3
+p <- 18
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[18]][[1]])
+get_segr(qtl[[18]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[18]][[2]])
+get_segr(qtl[[18]][[2]])
+
+#LEAFSHAP4
+p <- 19
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[19]][[1]])
+get_segr(qtl[[19]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[19]][[2]])
+get_segr(qtl[[19]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[19]][[3]])
+get_segr(qtl[[19]][[3]])
+
+#LEFTPP_TP1
+p <- 5
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[5]][[1]])
+get_segr(qtl[[5]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[5]][[2]])
+get_segr(qtl[[5]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[5]][[3]])
+get_segr(qtl[[5]][[3]])
+
+#LEFTPP_TP2
+p <- 7
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[7]][[1]])
+get_segr(qtl[[7]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[7]][[2]])
+get_segr(qtl[[7]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[7]][[3]])
+get_segr(qtl[[7]][[3]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[7]][[4]])
+get_segr(qtl[[7]][[4]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[7]][[5]])
+get_segr(qtl[[7]][[5]])
+
+#LEFTPP_TP3
+p <- 9
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[9]][[1]])
+get_segr(qtl[[9]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[9]][[2]])
+get_segr(qtl[[9]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[9]][[3]])
+get_segr(qtl[[9]][[3]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[9]][[4]])
+get_segr(qtl[[9]][[4]])
+
+#PLANTH_TP1
+p <- 11
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[11]][[1]])
+get_segr(qtl[[11]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[11]][[2]])
+get_segr(qtl[[11]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[11]][[3]])
+get_segr(qtl[[11]][[3]])
+
+#PLANTH_TP2
+p <- 13
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[13]][[1]])
+get_segr(qtl[[13]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[13]][[2]])
+get_segr(qtl[[13]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[13]][[3]])
+get_segr(qtl[[13]][[3]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[13]][[4]])
+get_segr(qtl[[13]][[4]])
+
+#VINDIA
+p <- 15
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[15]][[1]])
+get_segr(qtl[[15]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[15]][[2]])
+get_segr(qtl[[15]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[15]][[3]])
+get_segr(qtl[[15]][[3]])
+
+#LA
+p <- 30
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[30]][[1]])
+get_segr(qtl[[30]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[30]][[2]])
+get_segr(qtl[[30]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[30]][[3]])
+get_segr(qtl[[30]][[3]])
+```
+
+#### Additive and dominance effects of each parent
+
+```{r, eval = FALSE}
+#LEAFSHAP1
+qtl[[16]]
+get_segr(qtl[[16]][[1]])
+
+#LEAFSHAP2
+qtl[[17]]
+
+#LEAFSHAP3
+qtl[[18]]
+
+#LEAFSHAP4
+qtl[[19]]
+
+#LEFTPP_TP1
+qtl[[5]]
+
+#LEFTPP_TP2
+qtl[[7]]
+
+#LEFTPP_TP3
+qtl[[9]] 
+
+#PLANTH_TP1
+qtl[[11]]
+
+#PLANTH_TP2
+qtl[[13]]
+
+#VINDIA
+qtl[[15]]
+
+#LA
+qtl[[30]]
+```
+
+
+#### R2 of each QTL
+
+```{r}
+#LEAFSHAP1
+qtls16 <- r2_ls(fsib, pheno.col = 16, 
+                lg = c(3, 10, 12), 
+                pos = c("Chr03_2634116", "Chr10_18078811", "Chr12_1378180"))
+
+knitr::kable(qtls16)
+
+#LEAFSHAP2
+qtls17 <- r2_ls(fsib, pheno.col = 17, 
+                lg = c(3, 10, 11, 12), 
+                pos = c("Chr03_2347218", "Chr10_19597490", "Chr11_2819666", "Chr12_3168336"))
+
+knitr::kable(qtls17)
+
+#LEAFSHAP3
+qtls18 <- r2_ls(fsib, pheno.col = 18, 
+                lg = c(3, 12), 
+                pos = c("loc28", "Chr12_2787339"))
+
+knitr::kable(qtls18)
+
+#LEAFSHAP4
+qtls19 <- r2_ls(fsib, pheno.col = 19, 
+                lg = c(3, 11, 12), 
+                pos = c("loc28", "Chr11_2819609", "Chr12_2787339"))
+
+knitr::kable(qtls19)
+
+#LEFTPP_TP1
+qtls5 <- r2_ls(fsib, pheno.col = 5, 
+               lg = c(3, 12, 13), 
+               pos = c("Chr03_7783965", "Chr12_20760521", "Chr13_9041151"))
+
+knitr::kable(qtls5)
+
+#LEFTPP_TP2
+qtls7 <- r2_ls(fsib, pheno.col = 7, 
+               lg = c(1, 3, 4, 4, 9), 
+               pos = c("Chr01_30410817", "Chr03_27381031", "Chr04_3045638", "loc221", "Chr09_22844916"))
+
+knitr::kable(qtls7)
+
+#LEFTPP_TP3
+qtls9 <- r2_ls(fsib, pheno.col = 7, 
+               lg = c(1, 6, 7, 13), 
+               pos = c("Chr01_11083046", "Chr06_23470071", "Chr07_3604826", "Chr13_1910711"))
+
+knitr::kable(qtls9)
+
+#PLANTH_TP1
+qtls11 <- r2_ls(fsib, pheno.col = 11, 
+                lg = c(9, 10, 12), 
+                pos = c("Chr09_1515605", "Chr10_16210815", "Chr12_4116525"))
+
+knitr::kable(qtls11)
+
+#PLANTH_TP2
+qtls13 <- r2_ls(fsib, pheno.col = 13, 
+                lg = c(1, 3, 3, 4), 
+                pos = c("Chr01_29840645", "Chr03_24395656", "Chr03_12011722", "Chr04_29345158"))
+
+knitr::kable(qtls13)
+
+#VINDIA
+qtls15 <- r2_ls(fsib, pheno.col = 15, 
+                lg = c(2, 14, 15), 
+                pos = c("Chr02_8618789", "loc48", "Chr15_2674751"))
+
+knitr::kable(qtls15)
+
+#LA
+qtls30 <- r2_ls(fsib, pheno.col = 30, 
+                lg = c(7, 11, 12), 
+                pos = c("Chr07_1838294", "Chr11_2832259", "Chr12_4356601"))
+
+knitr::kable(qtls30)
+```
+
+##### Plot with triangles representing the QTL
+
+```{r, eval = FALSE}
+pdf("cim20_ggplot2.pdf", width = 16, height = 9)
+
+for(p in c(1:ncol(fsib$pheno))){
+  cim.df <- as.data.frame(cim20[[p]])
+  peaks.df <- as.data.frame(peaks[[p]])
+  cim_thr <- summary(cim_perm[[p]], alpha = 0.05, verbose = FALSE)[1, 1]
+  print(
+    ggplot() + 
+      geom_line(data = cim.df, aes(x = pos.cM, y = LOD), color = "black") + 
+      {if(!is.null(dim(peaks[[p]]))) geom_point(data = peaks.df, aes(x = pos.cM), y = 0, shape = 6, color = "black", size = 2)} + 
+      geom_abline(intercept = cim_thr, slope = 0, color = "black") + 
+      scale_y_continuous(limits = c(0,31)) +
+      labs(title = colnames(fsib$pheno)[p], x = "Position (cM)") + 
+      facet_grid(~lg, space = "free_x", scales = "free_x") + scale_x_continuous(breaks = seq(0, 300, 50), labels = seq(0, 300, 50)) + 
+      theme_minimal() +
+      theme(panel.grid = element_blank())
+  )
+}
+
+dev.off()
+```
+
+##### Better plot
+
+```{r}
+names(cim20) <- colnames(fsib$pheno)
+
+ggplot_qtl <- function(cim.df = cim.df, peaks.df = peaks.df, cim_thr = cim_thr){
+  cim.df$Phenotype <- factor(cim.df$Phenotype, levels = unique(cim.df$Phenotype))
+  peaks.df$Phenotype <- factor(peaks.df$Phenotype, levels = unique(peaks.df$Phenotype))
+  cim_thr$Phenotype <- factor(cim_thr$Phenotype, levels = unique(cim_thr$Phenotype))
+  peaks.df$y.dat <- -(max(peaks.df$LOD)/50)*rep(1:nlevels(peaks.df$Phenotype), table(peaks.df$Phenotype))
+  ggplot() + 
+    geom_line(data = cim.df, aes(x = pos.cM, y = LOD, color = Phenotype), alpha = 0.8) + 
+    {if(!is.null(dim(peaks.df))) geom_point(data = peaks.df, aes(x = pos.cM, color = Phenotype, y = y.dat), shape = 6, size = 1, stroke = 1, alpha = 0.8)} + 
+    geom_hline(data = cim_thr, aes(yintercept = lod, colour = Phenotype), linetype = 2, alpha = 0.8) +
+    scale_y_continuous(limits = c(min(peaks.df$y.dat), max(peaks.df$LOD)), labels = scales::label_number(accuracy = 0.1)) +
+    labs(x = "Posição (cM)", color = "") +
+    # facet_grid(Phenotype ~ lg, space = "free_x", scales = "free_x") +
+    facet_grid(. ~ lg, space = "free_x", scales = "free_x", switch = "x") +
+    scale_x_continuous(breaks = seq(0, 300, 50), labels = seq(0, 300, 50), expand = expansion(add = 20)) + 
+    theme_classic() +
+    # theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1), # uncomment if you want the numbers
+    theme(axis.text.x = element_blank(), axis.title.x = element_blank(), # comment if you want the numbers
+          strip.background = element_blank(), strip.placement = "outside", panel.spacing.x = unit(0.2, "lines"),
+          legend.position = "bottom", legend.margin = margin(t=-10)) + 
+    guides(colour = guide_legend(nrow = 1))
+}
+```
+
+
+
+
+```{r}
+#mudando o nome dos caracteres
+names(cim20) <- gsub("PSR_2016", "SRDW_2016", names(cim20))
+names(cim20) <- gsub("PFR_2016", "SRFW_2016", names(cim20))
+names(cim20) <- gsub("PSV_2016", "VDW_2016", names(cim20))
+names(cim20) <- gsub("PFV_2016", "VFW_2016", names(cim20))
+
+names(cim20) <- gsub("PSR_2017", "SRDW_2017", names(cim20))
+names(cim20) <- gsub("PFR_2017", "SRFW_2017", names(cim20))
+names(cim20) <- gsub("PSV_2017", "VDW_2017", names(cim20))
+names(cim20) <- gsub("PFV_2017", "VFW_2017", names(cim20))
+                     
+names(cim20) <- gsub("LFSIZE_2017", "LFSIZE1_2017", names(cim20))
+names(cim20) <- gsub("PETIOL_2017", "PETIOL1_2017", names(cim20))
+                     
+names(cim20) <- gsub("PFV.plant_2017","VFW_2017", names(cim20))
+names(cim20) <- gsub("PSV.plant_2017","VDW_2017", names(cim20))
+names(cim20) <- gsub("PFR.plant_2017","SRFW_2017", names(cim20))
+names(cim20) <- gsub("PSR.plant_2017","SRDW_2017", names(cim20))
+names(cim20) <- gsub("NOSR.plant_2017","NOSR_2017", names(cim20))
+```
+
+
+#### Artigo 1
+```{r}
+#renomeando o nome dos caracteres só para o artigo
+names(cim20) <- gsub("LEAFSHAP1_2016", "LEAFSHAP1", names(cim20))
+names(cim20) <- gsub("LEAFSHAP2_2016", "LEAFSHAP2", names(cim20))
+names(cim20) <- gsub("LEAFSHAP3_2016", "LEAFSHAP3", names(cim20))
+names(cim20) <- gsub("LEAFSHAP4_2016", "LEAFSHAP4", names(cim20))
+
+names(cim20) <- gsub("LEFTPP_TP1_2016", "LEFTPP_TP1", names(cim20))
+names(cim20) <- gsub("LEFTPP_TP2_2016", "LEFTPP_TP2", names(cim20))
+names(cim20) <- gsub("LEFTPP_TP3_2016", "LEFTPP_TP3", names(cim20))
+
+names(cim20) <- gsub("PLANTH_TP1_2016", "PLANTH_TP1", names(cim20))
+names(cim20) <- gsub("PLANTH_TP2_2016", "PLANTH_TP2", names(cim20))
+
+names(cim20) <- gsub("VINDIA_2016", "VINDIA", names(cim20))
+names(cim20) <- gsub("LA_2016", "LA", names(cim20))
+```
+
+```{r}
+#LEAFSHAP1, LEAFSHAP2, LEAFSHAP3, LEAFSHAP4
+cim.df <- peaks.df <- cim_thr <- c()
+for(p in c(16:19)){
+  cim.df <- rbind(cim.df, data.frame(cim20[[p]], Phenotype = names(cim20)[p]))
+  {if(!is.null(peaks[[p]])) peaks.df <- rbind(peaks.df, data.frame(peaks[[p]], Phenotype = names(cim20)[p]))}
+  cim_thr <- rbind(cim_thr, data.frame(lod=summary(cim_perm[[p]], alpha = 0.05, verbose = FALSE)[1, 1], Phenotype = names(cim20)[p]))
+}
+A <- ggplot_qtl(cim.df = cim.df, peaks.df = peaks.df, cim_thr = cim_thr); A
+ggsave("A.png", width = 10, height = 2.5, units = "in", dpi = 300)
+
+
+sel.traits <- c("LEFTPP_TP1", "LEFTPP_TP2", "LEFTPP_TP3", "PLANTH_TP1", "PLANTH_TP2", "VINDIA", "LA")
+cim.df <- peaks.df <- cim_thr <- c()
+for(p in which(names(cim20) %in% sel.traits)){
+  cim.df <- rbind(cim.df, data.frame(cim20[[p]], Phenotype = names(cim20)[p]))
+  {if(!is.null(peaks[[p]])) peaks.df <- rbind(peaks.df, data.frame(peaks[[p]], Phenotype = names(cim20)[p]))}
+  cim_thr <- rbind(cim_thr, data.frame(lod=summary(cim_perm[[p]], alpha = 0.05, verbose = FALSE)[1, 1], Phenotype = names(cim20)[p]))
+}
+B <- ggplot_qtl(cim.df = cim.df, peaks.df = peaks.df, cim_thr = cim_thr); B
+ggsave("B.png", width = 10, height = 2.5, units = "in", dpi = 300)
+
+
+ggpubr::ggarrange(A, B, labels = c("A", "B"), ncol = 1, nrow = 2)
+ggsave("AB.png", width = 8, height = 7, units = "in", dpi = 500)
+```
+
+
+### LinkageMap
+
+```{r}
+#install.packages("LinkageMapView")
+library(LinkageMapView)
+```
+
+```{r}
+write_map(chr_lgs_map, "results_onemap.txt")
+```
+
+```{r}
+sweetpotato <- read.csv("results_onemap.txt", sep = " ", stringsAsFactors = TRUE, header = FALSE)
+
+sweetpotato <- sweetpotato[c(1,3,2)]
+colnames(sweetpotato) <- c("Chr", "Pos", "Marker")
+
+sweetpotato$Chr <- as.character(sweetpotato$Chr)
+sweetpotato$Pos <- as.numeric(sweetpotato$Pos)
+sweetpotato$Marker <- as.character(sweetpotato$Marker)
+
+maxpos <- "2440.47"
+at.axis <- seq(0, maxpos)
+axlab <- vector()
+
+for (lab in 0:maxpos) {
+  if (!lab %% 50) {
+    axlab <- c(axlab, lab)
+  }
+  else {
+    axlab <- c(axlab, NA)
+  }
+}
+
+outfile = file.path(".", "density-map2.pdf")
+lmv.linkage.plot(sweetpotato, 
+                 outfile, 
+                 denmap = TRUE, 
+                 cex.axis = 1, 
+                 at.axis = at.axis, 
+                 labels.axis = axlab, 
+                 col.lgtitle = "black", 
+                 cex.lgtitle = 1)
+```
