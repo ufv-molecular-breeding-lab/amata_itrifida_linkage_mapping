@@ -67,7 +67,7 @@ library(sommer) #please make sure it's version 4.1.2
 
 Here we have the analysis in a loop; it may take some time on some computers:
 
-```{r, eval = FALSE}
+```{r, eval = FALSE, date.warning = FALSE}
 mod.list <- modr.list <- LRT.list <- blup.list <- varcomp.list <- h2.list <- list()
 
 for(trait in c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4","LEFTPP_TP1",
@@ -210,7 +210,7 @@ colnames(varcomp) <- c("Variance components","Standard error")
 ```{r}
 h2 <- cbind(t(h2.list[["LEAFSHAP1"]]), t(h2.list[["LEAFSHAP2"]]), 
             t(h2.list[["LEAFSHAP3"]]), t(h2.list[["LEAFSHAP4"]]),
-            t(h2.list[["LEFTPP_TP1"]]),  t(h2.list[["LEFTPP_TP2"]]),
+            t(h2.list[["LEFTPP_TP1"]]), t(h2.list[["LEFTPP_TP2"]]),
             t(h2.list[["LEFTPP_TP3"]]), t(h2.list[["PLANTH_TP1"]]),
             t(h2.list[["PLANTH_TP2"]]), t(h2.list[["VINDIA"]]), 
             t(h2.list[["LA"]]))
@@ -259,7 +259,9 @@ blups2016 <- data.frame(cbind(blup.list$LEAFSHAP1$pvals$predicted.value,
                               blup.list$VINDIA$pvals$predicted.value,
                               blup.list$LA$pvals$predicted.value))
 
-colnames(blups2016) <- c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4","LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3","PLANTH_TP1","PLANTH_TP2","VINDIA","LA")
+colnames(blups2016) <- c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4",
+                         "LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3",
+                         "PLANTH_TP1","PLANTH_TP2","VINDIA","LA")
 
 rownames(blups2016) <- blup.list$pvals$geno
 
@@ -1265,7 +1267,7 @@ ggplot(lgs_vs_chr) +
   scale_y_continuous(breaks = c(0, 10, 20, 30, 40, 50)) +
   labs(x = "Map position (cM)", y = "Genome position (Mbp)") +
   theme_bw() + 
-  theme(panel.spacing=unit(0, "lines"), 
+  theme(panel.spacing = unit(0, "lines"), 
         axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 
 ggsave("lgs_vs_chr_try.pdf", height = 8, width = 13)
@@ -1325,7 +1327,9 @@ blups16 <- data.frame(blup.list$LEAFSHAP1$pvals$predicted.value,
                       blup.list$VINDIA$pvals$predicted.value,
                       blup.list$LA$pvals$predicted.value)
 
-colnames(blups16) <- c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4","LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3","PLANTH_TP1","PLANTH_TP2","VINDIA","LA")
+colnames(blups16) <- c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4",
+                       "LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3",
+                       "PLANTH_TP1","PLANTH_TP2","VINDIA","LA")
 
 rownames(blups16) <- blup.list$LEAFSHAP1$pvals$geno
 
@@ -1382,7 +1386,9 @@ box16 <- data.frame(blup.list$LEAFSHAP1$pvals$predicted.value,
                     blup.list$VINDIA$pvals$predicted.value,
                     blup.list$LA$pvals$predicted.value)
 
-colnames(box16) <- c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4","LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3","PLANTH_TP1","PLANTH_TP2","VINDIA","LA")
+colnames(box16) <- c("LEAFSHAP1","LEAFSHAP2","LEAFSHAP3","LEAFSHAP4",
+                     "LEFTPP_TP1","LEFTPP_TP2","LEFTPP_TP3",
+                     "PLANTH_TP1","PLANTH_TP2","VINDIA","LA")
 
 box16$geno <- blup.list$LEAFSHAP1$pvals$geno
 
@@ -1432,7 +1438,7 @@ BLUPs:
 
 ```{r}
 pheno16 <- read.csv("pheno16.csv", header = TRUE, row.names = 1)
-colnames(pheno16) <- paste(colnames(pheno16), "2016", sep = "_")
+#colnames(pheno16) <- paste(colnames(pheno16), "2016", sep = "_")
 
 for(p in 1:ncol(pheno16)) {
   write.table(paste(paste0("*", colnames(pheno16)[p]), 
@@ -1459,11 +1465,15 @@ for(c in 2:15) {
 ```
 
 ```{r}
-#Raw data
+#raw data
 fs_data <- read_onemap(inputfile = "vcf_filtered.raw")
 fs_data
 
-#Information of linkage groups, step and mapping function
+fs_data$ind.names <- rownames(fs_data$geno) #sets the individual names in fs_data as the row names from the genotype matrix
+pheno16_ordered <- pheno16[fs_data$ind.names, ] #reorders the rows of the phenotype matrix (pheno16) to match the order of individuals in the genotype data
+fs_data$pheno <- pheno16_ordered #assigns the ordered phenotype matrix to fs_data so both datasets are synchronized
+
+#information of linkage groups, step and mapping function
 fsib <- create_fullsib(fs_data, map.list = chr_lgs_map, step = 1, map.function = "kosambi")
 fsib
 ```
@@ -1476,6 +1486,7 @@ fsib
 #`%||%` <- function (x, y) {if (is_null(x)) y else x}
 ```
 
+This step is gonna take a while
 ```{r, eval = FALSE}
 cofs_fs <- vector("list", ncol(fsib$pheno))
 pdf("cofs.pdf", width = 16, height = 9)
@@ -1506,6 +1517,7 @@ for(p in 1:length(cofs_fs)) {
 
 #### Permutation
 
+This step may take a very long time
 ```{r, eval = FALSE}
 set.seed(4321)
 
@@ -1613,40 +1625,40 @@ Segregation of each QTL:
 
 ```{r, eval = FALSE}
 #LEAFSHAP1
-p <- 16
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[16]][[1]])
-get_segr(qtl[[16]][[1]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[16]][[2]])
-get_segr(qtl[[16]][[2]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[16]][[3]])
-get_segr(qtl[[16]][[3]])
+p <- 1
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[1]][[1]])
+get_segr(qtl[[1]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[1]][[2]])
+get_segr(qtl[[1]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[1]][[3]])
+get_segr(qtl[[1]][[3]])
 
 #LEAFSHAP2
-p <- 17
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[17]][[1]])
-get_segr(qtl[[17]][[1]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[17]][[2]])
-get_segr(qtl[[17]][[2]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[17]][[3]])
-get_segr(qtl[[17]][[3]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[17]][[4]])
-get_segr(qtl[[17]][[4]])
+p <- 2
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[2]][[1]])
+get_segr(qtl[[2]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[2]][[2]])
+get_segr(qtl[[2]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[2]][[3]])
+get_segr(qtl[[2]][[3]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[2]][[4]])
+get_segr(qtl[[2]][[4]])
 
 #LEAFSHAP3
-p <- 18
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[18]][[1]])
-get_segr(qtl[[18]][[1]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[18]][[2]])
-get_segr(qtl[[18]][[2]])
+p <- 3
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[3]][[1]])
+get_segr(qtl[[3]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[3]][[2]])
+get_segr(qtl[[3]][[2]])
 
 #LEAFSHAP4
-p <- 19
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[19]][[1]])
-get_segr(qtl[[19]][[1]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[19]][[2]])
-get_segr(qtl[[19]][[2]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[19]][[3]])
-get_segr(qtl[[19]][[3]])
+p <- 4
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[4]][[1]])
+get_segr(qtl[[4]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[4]][[2]])
+get_segr(qtl[[4]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[4]][[3]])
+get_segr(qtl[[4]][[3]])
 
 #LEFTPP_TP1
 p <- 5
@@ -1658,6 +1670,19 @@ draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[5]][[3]])
 get_segr(qtl[[5]][[3]])
 
 #LEFTPP_TP2
+p <- 6
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[6]][[1]])
+get_segr(qtl[[6]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[6]][[2]])
+get_segr(qtl[[6]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[6]][[3]])
+get_segr(qtl[[6]][[3]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[6]][[4]])
+get_segr(qtl[[6]][[4]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[6]][[5]])
+get_segr(qtl[[6]][[5]])
+
+#LEFTPP_TP3
 p <- 7
 draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[7]][[1]])
 get_segr(qtl[[7]][[1]])
@@ -1667,10 +1692,17 @@ draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[7]][[3]])
 get_segr(qtl[[7]][[3]])
 draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[7]][[4]])
 get_segr(qtl[[7]][[4]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[7]][[5]])
-get_segr(qtl[[7]][[5]])
 
-#LEFTPP_TP3
+#PLANTH_TP1
+p <- 8
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[8]][[1]])
+get_segr(qtl[[8]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[8]][[2]])
+get_segr(qtl[[8]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[8]][[3]])
+get_segr(qtl[[8]][[3]])
+
+#PLANTH_TP2
 p <- 9
 draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[9]][[1]])
 get_segr(qtl[[9]][[1]])
@@ -1681,7 +1713,16 @@ get_segr(qtl[[9]][[3]])
 draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[9]][[4]])
 get_segr(qtl[[9]][[4]])
 
-#PLANTH_TP1
+#VINDIA
+p <- 10
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[10]][[1]])
+get_segr(qtl[[10]][[1]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[10]][[2]])
+get_segr(qtl[[10]][[2]])
+draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[10]][[3]])
+get_segr(qtl[[10]][[3]])
+
+#LA
 p <- 11
 draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[11]][[1]])
 get_segr(qtl[[11]][[1]])
@@ -1689,73 +1730,44 @@ draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[11]][[2]])
 get_segr(qtl[[11]][[2]])
 draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[11]][[3]])
 get_segr(qtl[[11]][[3]])
-
-#PLANTH_TP2
-p <- 13
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[13]][[1]])
-get_segr(qtl[[13]][[1]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[13]][[2]])
-get_segr(qtl[[13]][[2]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[13]][[3]])
-get_segr(qtl[[13]][[3]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[13]][[4]])
-get_segr(qtl[[13]][[4]])
-
-#VINDIA
-p <- 15
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[15]][[1]])
-get_segr(qtl[[15]][[1]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[15]][[2]])
-get_segr(qtl[[15]][[2]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[15]][[3]])
-get_segr(qtl[[15]][[3]])
-
-#LA
-p <- 30
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[30]][[1]])
-get_segr(qtl[[30]][[1]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[30]][[2]])
-get_segr(qtl[[30]][[2]])
-draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[30]][[3]])
-get_segr(qtl[[30]][[3]])
 ```
 
 #### Additive and dominance effects of each parent
 
 ```{r, eval = FALSE}
 #LEAFSHAP1
-qtl[[16]]
-get_segr(qtl[[16]][[1]])
+qtl[[1]]
+get_segr(qtl[[1]][[1]])
 
 #LEAFSHAP2
-qtl[[17]]
+qtl[[2]]
 
 #LEAFSHAP3
-qtl[[18]]
+qtl[[3]]
 
 #LEAFSHAP4
-qtl[[19]]
+qtl[[4]]
 
 #LEFTPP_TP1
 qtl[[5]]
 
 #LEFTPP_TP2
-qtl[[7]]
+qtl[[6]]
 
 #LEFTPP_TP3
-qtl[[9]] 
+qtl[[7]] 
 
 #PLANTH_TP1
-qtl[[11]]
+qtl[[8]]
 
 #PLANTH_TP2
-qtl[[13]]
+qtl[[9]]
 
 #VINDIA
-qtl[[15]]
+qtl[[10]]
 
 #LA
-qtl[[30]]
+qtl[[11]]
 ```
 
 
@@ -1763,32 +1775,32 @@ qtl[[30]]
 
 ```{r}
 #LEAFSHAP1
-qtls16 <- r2_ls(fsib, pheno.col = 16, 
+qtls1 <- r2_ls(fsib, pheno.col = 1, 
                 lg = c(3, 10, 12), 
                 pos = c("Chr03_2634116", "Chr10_18078811", "Chr12_1378180"))
 
-knitr::kable(qtls16)
+knitr::kable(qtls1)
 
 #LEAFSHAP2
-qtls17 <- r2_ls(fsib, pheno.col = 17, 
+qtls2 <- r2_ls(fsib, pheno.col = 2, 
                 lg = c(3, 10, 11, 12), 
                 pos = c("Chr03_2347218", "Chr10_19597490", "Chr11_2819666", "Chr12_3168336"))
 
-knitr::kable(qtls17)
+knitr::kable(qtls2)
 
 #LEAFSHAP3
-qtls18 <- r2_ls(fsib, pheno.col = 18, 
+qtls3 <- r2_ls(fsib, pheno.col = 3, 
                 lg = c(3, 12), 
                 pos = c("loc28", "Chr12_2787339"))
 
-knitr::kable(qtls18)
+knitr::kable(qtls3)
 
 #LEAFSHAP4
-qtls19 <- r2_ls(fsib, pheno.col = 19, 
+qtls4 <- r2_ls(fsib, pheno.col = 4, 
                 lg = c(3, 11, 12), 
                 pos = c("loc28", "Chr11_2819609", "Chr12_2787339"))
 
-knitr::kable(qtls19)
+knitr::kable(qtls4)
 
 #LEFTPP_TP1
 qtls5 <- r2_ls(fsib, pheno.col = 5, 
@@ -1798,46 +1810,46 @@ qtls5 <- r2_ls(fsib, pheno.col = 5,
 knitr::kable(qtls5)
 
 #LEFTPP_TP2
-qtls7 <- r2_ls(fsib, pheno.col = 7, 
+qtls6 <- r2_ls(fsib, pheno.col = 6, 
                lg = c(1, 3, 4, 4, 9), 
                pos = c("Chr01_30410817", "Chr03_27381031", "Chr04_3045638", "loc221", "Chr09_22844916"))
 
-knitr::kable(qtls7)
+knitr::kable(qtls6)
 
 #LEFTPP_TP3
-qtls9 <- r2_ls(fsib, pheno.col = 7, 
+qtls7 <- r2_ls(fsib, pheno.col = 7, 
                lg = c(1, 6, 7, 13), 
                pos = c("Chr01_11083046", "Chr06_23470071", "Chr07_3604826", "Chr13_1910711"))
 
-knitr::kable(qtls9)
+knitr::kable(qtls7)
 
 #PLANTH_TP1
-qtls11 <- r2_ls(fsib, pheno.col = 11, 
+qtls8 <- r2_ls(fsib, pheno.col = 8, 
                 lg = c(9, 10, 12), 
                 pos = c("Chr09_1515605", "Chr10_16210815", "Chr12_4116525"))
 
-knitr::kable(qtls11)
+knitr::kable(qtls8)
 
 #PLANTH_TP2
-qtls13 <- r2_ls(fsib, pheno.col = 13, 
+qtls9 <- r2_ls(fsib, pheno.col = 9, 
                 lg = c(1, 3, 3, 4), 
                 pos = c("Chr01_29840645", "Chr03_24395656", "Chr03_12011722", "Chr04_29345158"))
 
-knitr::kable(qtls13)
+knitr::kable(qtls9)
 
 #VINDIA
-qtls15 <- r2_ls(fsib, pheno.col = 15, 
+qtls10 <- r2_ls(fsib, pheno.col = 10, 
                 lg = c(2, 14, 15), 
                 pos = c("Chr02_8618789", "loc48", "Chr15_2674751"))
 
-knitr::kable(qtls15)
+knitr::kable(qtls10)
 
 #LA
-qtls30 <- r2_ls(fsib, pheno.col = 30, 
+qtls11 <- r2_ls(fsib, pheno.col = 11, 
                 lg = c(7, 11, 12), 
                 pos = c("Chr07_1838294", "Chr11_2832259", "Chr12_4356601"))
 
-knitr::kable(qtls30)
+knitr::kable(qtls11)
 ```
 
 ##### Plot with triangles representing the QTL
@@ -1893,55 +1905,10 @@ ggplot_qtl <- function(cim.df = cim.df, peaks.df = peaks.df, cim_thr = cim_thr){
 }
 ```
 
-
-
-
-```{r}
-#mudando o nome dos caracteres
-names(cim20) <- gsub("PSR_2016", "SRDW_2016", names(cim20))
-names(cim20) <- gsub("PFR_2016", "SRFW_2016", names(cim20))
-names(cim20) <- gsub("PSV_2016", "VDW_2016", names(cim20))
-names(cim20) <- gsub("PFV_2016", "VFW_2016", names(cim20))
-
-names(cim20) <- gsub("PSR_2017", "SRDW_2017", names(cim20))
-names(cim20) <- gsub("PFR_2017", "SRFW_2017", names(cim20))
-names(cim20) <- gsub("PSV_2017", "VDW_2017", names(cim20))
-names(cim20) <- gsub("PFV_2017", "VFW_2017", names(cim20))
-                     
-names(cim20) <- gsub("LFSIZE_2017", "LFSIZE1_2017", names(cim20))
-names(cim20) <- gsub("PETIOL_2017", "PETIOL1_2017", names(cim20))
-                     
-names(cim20) <- gsub("PFV.plant_2017","VFW_2017", names(cim20))
-names(cim20) <- gsub("PSV.plant_2017","VDW_2017", names(cim20))
-names(cim20) <- gsub("PFR.plant_2017","SRFW_2017", names(cim20))
-names(cim20) <- gsub("PSR.plant_2017","SRDW_2017", names(cim20))
-names(cim20) <- gsub("NOSR.plant_2017","NOSR_2017", names(cim20))
-```
-
-
-#### Artigo 1
-```{r}
-#renomeando o nome dos caracteres só para o artigo
-names(cim20) <- gsub("LEAFSHAP1_2016", "LEAFSHAP1", names(cim20))
-names(cim20) <- gsub("LEAFSHAP2_2016", "LEAFSHAP2", names(cim20))
-names(cim20) <- gsub("LEAFSHAP3_2016", "LEAFSHAP3", names(cim20))
-names(cim20) <- gsub("LEAFSHAP4_2016", "LEAFSHAP4", names(cim20))
-
-names(cim20) <- gsub("LEFTPP_TP1_2016", "LEFTPP_TP1", names(cim20))
-names(cim20) <- gsub("LEFTPP_TP2_2016", "LEFTPP_TP2", names(cim20))
-names(cim20) <- gsub("LEFTPP_TP3_2016", "LEFTPP_TP3", names(cim20))
-
-names(cim20) <- gsub("PLANTH_TP1_2016", "PLANTH_TP1", names(cim20))
-names(cim20) <- gsub("PLANTH_TP2_2016", "PLANTH_TP2", names(cim20))
-
-names(cim20) <- gsub("VINDIA_2016", "VINDIA", names(cim20))
-names(cim20) <- gsub("LA_2016", "LA", names(cim20))
-```
-
 ```{r}
 #LEAFSHAP1, LEAFSHAP2, LEAFSHAP3, LEAFSHAP4
 cim.df <- peaks.df <- cim_thr <- c()
-for(p in c(16:19)){
+for(p in c(1:4)){
   cim.df <- rbind(cim.df, data.frame(cim20[[p]], Phenotype = names(cim20)[p]))
   {if(!is.null(peaks[[p]])) peaks.df <- rbind(peaks.df, data.frame(peaks[[p]], Phenotype = names(cim20)[p]))}
   cim_thr <- rbind(cim_thr, data.frame(lod=summary(cim_perm[[p]], alpha = 0.05, verbose = FALSE)[1, 1], Phenotype = names(cim20)[p]))
