@@ -1336,41 +1336,6 @@ rownames(blups16) <- blup.list$LEAFSHAP1$pvals$geno
 write.csv(blups16, file = "pheno16.csv", row.names = TRUE)
 ```
 
-```{r}
-#load("blup.modelo.list.RData")
-
-#blups17 <- data.frame(blup.modelo.list$SRDW$pvals$predicted.value,
-#                      blup.modelo.list$SRFW$pvals$predicted.value,
-#                      blup.modelo.list$VDW$pvals$predicted.value,
-#                      blup.modelo.list$VFW$pvals$predicted.value,
-#                      blup.modelo.list$LFSIZE1$pvals$predicted.value,
-#                      blup.modelo.list$LFSIZE2$pvals$predicted.value,
-#                      blup.modelo.list$PETIOL1$pvals$predicted.value,
-#                      blup.modelo.list$PETIOL2$pvals$predicted.value,
-#                      blup.modelo.list$LAI$pvals$predicted.value,
-#                      blup.modelo.list$NOPH$pvals$predicted.value,
-#                      blup.modelo.list$VFW.plant$pvals$predicted.value,
-#                      blup.modelo.list$VDW.plant$pvals$predicted.value,
-#                      blup.modelo.list$VFW_sab$pvals$predicted.value,
-#                      blup.modelo.list$VDW_sam$pvals$predicted.value,
-#                      blup.modelo.list$SRFW_sam$pvals$predicted.value,
-#                      blup.modelo.list$SRDW_sam$pvals$predicted.value,
-#                      blup.modelo.list$SRFW.plant$pvals$predicted.value,
-#                      blup.modelo.list$SRDW.plant$pvals$predicted.value,
-#                      blup.modelo.list$NOSR$pvals$predicted.value,
-#                      blup.modelo.list$NOSR.plant$pvals$predicted.value,
-#                      blup.modelo.list$PTRN$pvals$predicted.value,
-#                      blup.modelo.list$PTRN.plant$pvals$predicted.value,
-#                      blup.modelo.list$PTRFW$pvals$predicted.value,
-#                      blup.modelo.list$PTRFW.plant$pvals$predicted.value)
-
-#colnames(blups17) <- c("SRDW","SRFW","VDW","VFW","LFSIZE1","LFSIZE2","PETIOL1","PETIOL2","LAI","NOPH","VFW.plant","VDW.plant","VFW_sab","VDW_sam","SRFW_sam","SRDW_sam","SRFW.plant","SRDW.plant","NOSR","NOSR.plant","PTRN","PTRN.plant","PTRFW","PTRFW.plant")
-                       
-#rownames(blups17) <- blup.modelo.list$SRDW$pvals$geno
-            
-#write.csv(blups17, file = "pheno17.csv", row.names = TRUE)
-```
-
 Plot - boxplot and violin:
 
 ```{r}
@@ -1737,7 +1702,6 @@ get_segr(qtl[[11]][[3]])
 ```{r, eval = FALSE}
 #LEAFSHAP1
 qtl[[1]]
-get_segr(qtl[[1]][[1]])
 
 #LEAFSHAP2
 qtl[[2]]
@@ -1769,7 +1733,6 @@ qtl[[10]]
 #LA
 qtl[[11]]
 ```
-
 
 #### R2 of each QTL
 
