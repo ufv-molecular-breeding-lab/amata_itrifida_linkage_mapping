@@ -1336,7 +1336,7 @@ rownames(blups16) <- blup.list$LEAFSHAP1$pvals$geno
 write.csv(blups16, file = "pheno16.csv", row.names = TRUE)
 ```
 
-Plot - boxplot and violin:
+Violin plot:
 
 ```{r}
 box16 <- data.frame(blup.list$LEAFSHAP1$pvals$predicted.value,
@@ -1369,27 +1369,47 @@ box16_long$Year <- "2016"
 box16_long$Phenotype <- factor(box16_long$Phenotype, levels = unique(box16_long$Phenotype))
 box16_long$geno <- gsub("CIP107665.19", "M19", box16_long$geno)
 box16_long$geno <- gsub("CIP107665.9", "M9", box16_long$geno)
-head(box16_long)
+
+box16 <- box16_long %>% select("geno", "Phenotype", "Value")
+head(box16)
+table(box16$Phenotype)
+
+box16$Type <- unlist(lapply(strsplit(as.character(box16$Phenotype), split = ""), tail, 1))
+box16$Type <- ifelse(!box16$Type %in% c("1","2","3","4"), "", box16$Type)
+box16$Pheno <- substr(as.character(box16$Phenotype), 1, 6)
+box16$Pheno <- ifelse(box16$Pheno == "LEAFSH", "LEAFSHAP", box16$Pheno)
+box16$Pheno <- factor(box16$Pheno, levels = c("LEAFSHAP","LEFTPP","PLANTH", "VINDIA", "LA"))
+table(box16$Pheno)
+table(box16$Type)
 ```
 
 ```{r}
-ggplot(box16_long, aes(x = Year, y = Value)) + 
-  geom_violin(aes(group = Year), color = "salmon") + 
-  geom_point(data = box16_long %>% filter(geno %in% c("M19", "M9")), 
-             aes(shape = geno), 
-             color = "black", alpha = 0.7, size = 1, stroke = 1.5) + 
-  scale_shape_manual(values = c(3,4)) + 
-  facet_wrap(. ~ Phenotype, scales = "free_y", nrow = 3) + 
-  labs(y = "Predict Value", shape = "Parent") + 
-  theme_bw() + 
-  theme(axis.title.x = element_blank(), 
-        axis.text.x = element_blank(), 
-        axis.ticks.x = element_blank(), 
-        legend.position = "right", 
-        legend.title = element_text(size = 12), 
-        legend.text = element_text(size = 10))
+library(smplot2)
 
-ggsave("violin.png", width = 8, height = 6, units = "in", dpi = 300)
+ggplot(data = box16  %>% filter(!geno %in% c("M19", "M9")), mapping = aes(x = Type, y = Value, fill = Pheno)) +
+  ggforce::facet_row(vars(Pheno), scales = 'free', space = 'free') +
+  # facet_wrap(. ~ Pheno, scales = "free", space = "free", nrow = 1) +
+  sm_raincloud(
+    boxplot.params = list(color = "white"),
+    violin.params = list(
+      alpha = 0.5, 
+      scale = "width"),
+    point.params = list(
+      alpha = 0.7,
+      stroke = 0.1,
+      color = "white",
+      size = 1.5
+    )
+  ) +
+  geom_point(data = box16 %>% filter(geno %in% c("M9", "M19")), 
+             aes(shape = geno), color = "black", alpha = 0.7, size = 1, stroke = 1.5) +
+  scale_shape_manual(values = c(3,4), breaks = c('M9', 'M19')) +
+  labs(y = "Adjusted means", shape = "Parent") +
+  theme_classic() +
+  guides(fill = "none") +
+  theme(strip.background = element_blank())
+
+ggsave("violino2.png", width = 8, height = 3, units = "in", dpi = 400) 
 ```
 
 ### Reading data and filtering
@@ -1403,7 +1423,6 @@ BLUPs:
 
 ```{r}
 pheno16 <- read.csv("pheno16.csv", header = TRUE, row.names = 1)
-#colnames(pheno16) <- paste(colnames(pheno16), "2016", sep = "_")
 
 for(p in 1:ncol(pheno16)) {
   write.table(paste(paste0("*", colnames(pheno16)[p]), 
@@ -1411,12 +1430,6 @@ for(p in 1:ncol(pheno16)) {
               file = "vcf_filtered.raw", row.names = FALSE, 
               col.names = FALSE, quote = FALSE, append = TRUE)
 }
-
-#pheno17 <- read.csv("pheno17.csv", header = TRUE, row.names = 1)
-#colnames(pheno17) <- paste(colnames(pheno17), "2017", sep = "_")
-#for(p in 1:ncol(pheno17)) {
-#  write.table(paste(paste0("*", colnames(pheno17)[p]), paste(pheno17[inds,p], collapse = " "), collapse = "\n", sep = " "), file = "vcf_filtered.raw", row.names = FALSE, col.names = FALSE, quote = FALSE, append = TRUE)
-#}
 ```
 
 Loading map:
@@ -1739,29 +1752,29 @@ qtl[[11]]
 ```{r}
 #LEAFSHAP1
 qtls1 <- r2_ls(fsib, pheno.col = 1, 
-                lg = c(3, 10, 12), 
-                pos = c("Chr03_2634116", "Chr10_18078811", "Chr12_1378180"))
+               lg = c(3, 10, 12), 
+               pos = c("Chr03_2634116", "Chr10_18078811", "Chr12_1378180"))
 
 knitr::kable(qtls1)
 
 #LEAFSHAP2
 qtls2 <- r2_ls(fsib, pheno.col = 2, 
-                lg = c(3, 10, 11, 12), 
-                pos = c("Chr03_2347218", "Chr10_19597490", "Chr11_2819666", "Chr12_3168336"))
+               lg = c(3, 10, 11, 12), 
+               pos = c("Chr03_2347218", "Chr10_19597490", "Chr11_2819666", "Chr12_3168336"))
 
 knitr::kable(qtls2)
 
 #LEAFSHAP3
 qtls3 <- r2_ls(fsib, pheno.col = 3, 
-                lg = c(3, 12), 
-                pos = c("loc28", "Chr12_2787339"))
+               lg = c(3, 12), 
+               pos = c("loc28", "Chr12_2787339"))
 
 knitr::kable(qtls3)
 
 #LEAFSHAP4
 qtls4 <- r2_ls(fsib, pheno.col = 4, 
-                lg = c(3, 11, 12), 
-                pos = c("loc28", "Chr11_2819609", "Chr12_2787339"))
+               lg = c(3, 11, 12), 
+               pos = c("loc28", "Chr11_2819609", "Chr12_2787339"))
 
 knitr::kable(qtls4)
 
@@ -1788,15 +1801,15 @@ knitr::kable(qtls7)
 
 #PLANTH_TP1
 qtls8 <- r2_ls(fsib, pheno.col = 8, 
-                lg = c(9, 10, 12), 
-                pos = c("Chr09_1515605", "Chr10_16210815", "Chr12_4116525"))
+               lg = c(9, 10, 12), 
+               pos = c("Chr09_1515605", "Chr10_16210815", "Chr12_4116525"))
 
 knitr::kable(qtls8)
 
 #PLANTH_TP2
 qtls9 <- r2_ls(fsib, pheno.col = 9, 
-                lg = c(1, 3, 3, 4), 
-                pos = c("Chr01_29840645", "Chr03_24395656", "Chr03_12011722", "Chr04_29345158"))
+               lg = c(1, 3, 3, 4), 
+               pos = c("Chr01_29840645", "Chr03_24395656", "Chr03_12011722", "Chr04_29345158"))
 
 knitr::kable(qtls9)
 
