@@ -49,6 +49,66 @@ summary(data2016)
 head(data2016)
 ```
 
+### Histograms
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+plot_list <- list()
+
+#histogram for each trait
+for(trait in colnames(data2016)[!colnames(data2016) %in% c("geno", "rep")]) {
+  p <- ggplot(data2016, aes_string(x = trait)) +
+    geom_histogram(bins = 25, fill = "steelblue", color = "white", alpha = 0.85) +
+    labs(title = trait, x = trait, y = "Frequency") +
+    theme_minimal() +
+    theme(plot.title = element_text(size = 14, face = "bold"))
+  
+  plot_list[[trait]] <- p
+}
+
+gridExtra::grid.arrange(grobs = plot_list[1:11], ncol = 3)
+```
+
+### Normality test – Shapiro-Wilk
+
+```{r}
+for (trait in colnames(data2016)[!colnames(data2016) %in% c("geno", "rep")]) {
+  cat("\nTrait:", trait, "\n")
+  result <- shapiro.test(data2016[[trait]])
+  cat("W =", round(result$statistic, 4), 
+      "| p-value =", format(result$p.value, scientific = TRUE, digits = 3), "\n")
+}
+```
+
+```{r}
+shapiro_tbl <- data.frame(
+  Trait = character(),
+  W = numeric(),
+  p_value_raw = numeric(),
+  p_value_fmt = character(),
+  Normal = character(),
+  stringsAsFactors = FALSE
+)
+
+for (trait in colnames(data2016)[!colnames(data2016) %in% c("geno", "rep")]) {
+  result <- shapiro.test(data2016[[trait]])
+  pval <- result$p.value
+  shapiro_tbl <- rbind(shapiro_tbl, data.frame(
+    Trait = trait,
+    W = round(result$statistic, 4),
+    p_value_raw = pval,
+    p_value_fmt = format(pval, scientific = TRUE, digits = 3)
+  ))
+}
+
+shapiro_tbl <- shapiro_tbl[order(shapiro_tbl$p_value_raw), ]
+shapiro_tbl$p_value_raw <- NULL
+
+knitr::kable(shapiro_tbl, caption = "Shapiro-Wilk test with real p-values")
+```
+
 ## The mixed model
 
 $$y_{ij} = \mu + b_j + g_i + e_{ij}$$
@@ -1943,7 +2003,7 @@ for (lab in 0:maxpos) {
   }
 }
 
-outfile = file.path(".", "density-map2.pdf")
+outfile = file.path(".", "density-map.pdf")
 lmv.linkage.plot(sweetpotato, 
                  outfile, 
                  denmap = TRUE, 
