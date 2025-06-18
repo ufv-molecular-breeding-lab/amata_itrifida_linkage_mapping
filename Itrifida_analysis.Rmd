@@ -194,61 +194,20 @@ load("h2.list.RData")
 
 Here we see the mean (**m**) and the coefficients of variation (**cv**) of each trait:
 
-```{r, eval = FALSE}
-sd1 <- sqrt(varcomp.list[["LEAFSHAP1"]][["VarComp"]][[1]])
-m1 <- mean(blup.list$LEAFSHAP1$pvals$predicted.value)
-cv1 <- sd1/m1 
-cv1
+```{r}
+traits <- c("LEAFSHAP1", "LEAFSHAP2", "LEAFSHAP3", "LEAFSHAP4",
+            "LEFTPP_TP1", "LEFTPP_TP2", "LEFTPP_TP3",
+            "PLANTH_TP1", "PLANTH_TP2", "VINDIA", "LA")
 
-sd2 <- sqrt(varcomp.list[["LEAFSHAP2"]][["VarComp"]][[1]])
-m2 <- mean(blup.list$LEAFSHAP2$pvals$predicted.value)
-cv2 <- sd2/m2
-cv2
+calc_cv <- function(trait) {
+  sd <- sqrt(varcomp.list[[trait]][["VarComp"]][[1]])
+  m <- mean(blup.list[[trait]]$pvals$predicted.value)
+  cv <- sd / m
+  return(data.frame(trait = trait, mean = m, cv = cv))
+}
 
-sd3 <- sqrt(varcomp.list[["LEAFSHAP3"]][["VarComp"]][[1]])
-m3 <- mean(blup.list$LEAFSHAP3$pvals$predicted.value)
-cv3 <- sd3/m3 
-cv3
-
-sd4 <- sqrt(varcomp.list[["LEAFSHAP4"]][["VarComp"]][[1]])
-m4 <- mean(blup.list$LEAFSHAP4$pvals$predicted.value)
-cv4 <- sd4/m4 
-cv4
-
-sd5 <- sqrt(varcomp.list[["LEFTPP_TP1"]][["VarComp"]][[1]])
-m5 <- mean(blup.list$LEFTPP_TP1$pvals$predicted.value)
-cv5 <- sd5/m5 
-cv5
-
-sd6 <- sqrt(varcomp.list[["LEFTPP_TP2"]][["VarComp"]][[1]])
-m6 <- mean(blup.list$LEFTPP_TP2$pvals$predicted.value)
-cv6 <- sd6/m6 
-cv6
-
-sd7 <- sqrt(varcomp.list[["LEFTPP_TP3"]][["VarComp"]][[1]])
-m7 <- mean(blup.list$LEFTPP_TP3$pvals$predicted.value)
-cv7 <- sd7/m7
-cv7
-
-sd8 <- sqrt(varcomp.list[["PLANTH_TP1"]][["VarComp"]][[1]])
-m8 <- mean(blup.list$PLANTH_TP1$pvals$predicted.value)
-cv8 <- sd8/m8
-cv8
-
-sd9 <- sqrt(varcomp.list[["PLANTH_TP2"]][["VarComp"]][[1]])
-m9 <- mean(blup.list$PLANTH_TP2$pvals$predicted.value)
-cv9 <- sd9/m9 
-cv9
-
-sd10 <- sqrt(varcomp.list[["VINDIA"]][["VarComp"]][[1]])
-m10 <- mean(blup.list$VINDIA$pvals$predicted.value)
-cv10 <- sd10/m10 
-cv10
-
-sd11 <- sqrt(varcomp.list[["LA"]][["VarComp"]][[1]])
-m11 <- mean(blup.list$LA$pvals$predicted.value)
-cv11 <- sd11/m11
-cv11
+cv_results <- do.call(rbind, lapply(traits, calc_cv))
+print(cv_results)
 ```
 
 ### Variance components and heritabilities
@@ -1143,7 +1102,7 @@ for(c in 2:15) {
 save(chr_lgs_map, file = "chr_lgs_map_fixed.RData")
 ```
 
-Visualize heatmaps::
+Visualize heatmaps:
 
 ```{r, echo = -1}
 load("chr_lgs_map_fixed.RData")
@@ -1773,38 +1732,22 @@ get_segr(qtl[[11]][[3]])
 #### Additive and dominance effects of each parent
 
 ```{r, eval = FALSE}
-#LEAFSHAP1
-qtl[[1]]
+trait_names <- c("LEAFSHAP1", "LEAFSHAP2", "LEAFSHAP3", "LEAFSHAP4",
+                 "LEFTPP_TP1", "LEFTPP_TP2", "LEFTPP_TP3",
+                 "PLANTH_TP1", "PLANTH_TP2", "VINDIA", "LA")
 
-#LEAFSHAP2
-qtl[[2]]
+for (p in seq_along(qtl)) {
+  cat("\n#==================\n")
+  cat(paste0("# ", trait_names[p], "\n"))
+  cat("#==================\n")
+  
+  print(qtl[[p]]) 
 
-#LEAFSHAP3
-qtl[[3]]
-
-#LEAFSHAP4
-qtl[[4]]
-
-#LEFTPP_TP1
-qtl[[5]]
-
-#LEFTPP_TP2
-qtl[[6]]
-
-#LEFTPP_TP3
-qtl[[7]] 
-
-#PLANTH_TP1
-qtl[[8]]
-
-#PLANTH_TP2
-qtl[[9]]
-
-#VINDIA
-qtl[[10]]
-
-#LA
-qtl[[11]]
+  for (i in seq_along(qtl[[p]])) {
+    draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[p]][[i]])
+    get_segr(qtl[[p]][[i]])
+  }
+}
 ```
 
 #### R2 of each QTL
@@ -1968,7 +1911,6 @@ ggpubr::ggarrange(A, B, labels = c("A", "B"), ncol = 1, nrow = 2)
 ggsave("AB.png", width = 8, height = 7, units = "in", dpi = 500)
 ```
 
-
 ### LinkageMap
 
 ```{r}
@@ -2013,3 +1955,4 @@ lmv.linkage.plot(sweetpotato,
                  col.lgtitle = "black", 
                  cex.lgtitle = 1)
 ```
+
