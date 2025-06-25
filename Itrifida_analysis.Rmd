@@ -210,6 +210,27 @@ cv_results <- do.call(rbind, lapply(traits, calc_cv))
 print(cv_results)
 ```
 
+Since we already have the BLUPs for the phenotypic traits, the next step is to calculate the adjusted means for the parents (M9 and M19).
+
+```{r}
+parents <- c("CIP107665.9","CIP107665.19")
+
+#adjusted means for each trait and each parent
+adjusted_means <- data.frame(Trait = rep(colnames(data2016)[!colnames(data2016) %in% c("geno", "rep")], each = length(parents)),
+                             Parent = rep(parents, times = length(colnames(data2016)[!colnames(data2016) %in% c("geno", "rep")])),
+                             Adjusted_Mean = numeric(length(parents) * length(colnames(data2016)[!colnames(data2016) %in% c("geno", "rep")])))
+
+
+for (trait in colnames(data2016)[!colnames(data2016) %in% c("geno", "rep")]) {
+  for (parent in parents) {
+    mean_value <- mean(blup.list[[trait]]$pvals$predicted.value[blup.list[[trait]]$pvals$geno == parent])
+    adjusted_means$Adjusted_Mean[adjusted_means$Trait == trait & adjusted_means$Parent == parent] <- mean_value
+  }
+}
+
+knitr::kable(adjusted_means, caption = "Adjusted means for both parents")
+```
+
 ### Variance components and heritabilities
 
 To make it easier, we extracted the variance components and the heritabilities of the traits into an XLSX file:
