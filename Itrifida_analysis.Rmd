@@ -276,7 +276,7 @@ xlsx::write.xlsx2(varcomp,paste0("GeneticParameters_2016.xlsx"), sheetName = "Va
 xlsx::write.xlsx2(h2,paste0("GeneticParameters_2016.xlsx"), sheetName = "Heritabilities", append = TRUE)
 ```
 
-## Correlations
+## Correlations (Figure 2)
 
 Pairwise Pearson’s correlations assuming a significant global level of 5%.
 
@@ -1258,7 +1258,7 @@ for(c in 2:15) {
 save(chr_lgs_map, file = "chr_lgs_map_try.RData")
 ```
 
-Visualize heatmaps:
+Visualize heatmaps (Figure 3):
 
 ```{r, echo = -1}
 load("chr_lgs_map_try.RData")
@@ -1282,7 +1282,7 @@ Visualize maps:
 draw_map(chr_lgs_map, names = FALSE, grid = FALSE, cex.mrk = 0.7)
 ```
 
-Linkage groups *versus* chromosomes:
+Linkage groups *versus* chromosomes (Figure 4):
 
 ```{r}
 lgs_vs_chr <- data.frame(row.names = c("ID", "Chr", "bp", "Lgr", "cM"))
@@ -1376,7 +1376,7 @@ rownames(blups16) <- blup.list$LEAFSHAP1$pvals$geno
 write.csv(blups16, file = "pheno16.csv", row.names = TRUE)
 ```
 
-Violin plot:
+Violin plot (Figure 1):
 
 ```{r}
 box16 <- data.frame(blup.list$LEAFSHAP1$pvals$predicted.value,
@@ -1419,6 +1419,18 @@ box16$Type <- ifelse(!box16$Type %in% c("1","2","3","4"), "", box16$Type)
 box16$Pheno <- substr(as.character(box16$Phenotype), 1, 6)
 box16$Pheno <- ifelse(box16$Pheno == "LEAFSH", "LEAFSHAP", box16$Pheno)
 box16$Pheno <- factor(box16$Pheno, levels = c("LEAFSHAP","LEFTPP","PLANTH", "VINDIA", "LA"))
+
+#replacing only the levels of Type for LEFTPP and PLANTH
+box16 <- box16 %>%
+  mutate(Type = case_when(
+    Pheno == "LEFTPP" & Type == "1" ~ "12 days",
+    Pheno == "LEFTPP" & Type == "2" ~ "30 days",
+    Pheno == "LEFTPP" & Type == "3" ~ "58–62 days",
+    Pheno == "PLANTH" & Type == "1" ~ "11 days",
+    Pheno == "PLANTH" & Type == "2" ~ "30 days",
+    TRUE ~ Type #LEAFSHAP and the others remain as they are  
+  ))
+
 table(box16$Pheno)
 table(box16$Type)
 ```
@@ -1449,7 +1461,7 @@ ggplot(data = box16  %>% filter(!geno %in% c("M19", "M9")), mapping = aes(x = Ty
   guides(fill = "none") +
   theme(strip.background = element_blank())
 
-ggsave("violino2.png", width = 8, height = 3, units = "in", dpi = 400) 
+ggsave("violin.png", width = 10, height = 4, units = "in", dpi = 400)
 ```
 
 ### Reading data and filtering
@@ -1877,7 +1889,7 @@ for(p in c(1:ncol(fsib$pheno))){
 dev.off()
 ```
 
-##### Better plot
+##### Better plot (Figure 6)
 
 ```{r}
 names(cim20) <- colnames(fsib$pheno)
@@ -1932,7 +1944,7 @@ ggpubr::ggarrange(A, B, labels = c("A", "B"), ncol = 1, nrow = 2)
 ggsave("AB.png", width = 8, height = 7, units = "in", dpi = 500)
 ```
 
-### LinkageMap
+### LinkageMap (Figure 5)
 
 ```{r}
 #install.packages("LinkageMapView")
