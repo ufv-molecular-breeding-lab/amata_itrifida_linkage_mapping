@@ -1783,6 +1783,66 @@ for (p in seq_along(qtl)) {
 }
 ```
 
+Organizing in a table:
+```{r}
+table_data <- list()
+
+for (p in seq_along(qtl)) {
+  trait <- trait_names[p] 
+  cat("\n#==================\n")
+  cat(paste0("# ", trait, "\n"))
+  cat("#==================\n")
+  
+  #creating a table to store the information of each QTL
+  qtl_data <- data.frame(
+    lg = numeric(0),
+    pos = numeric(0),
+    global_LOD = numeric(0),
+    Estimate_M9 = numeric(0),
+    lod_M9 = numeric(0),
+    Estimate_M19 = numeric(0),
+    lod_M19 = numeric(0),
+    Estimate_Dominance = numeric(0),
+    lod_Dominance = numeric(0)
+  )
+  
+  for (i in seq_along(qtl[[p]])) {
+    qtl_matrix <- qtl[[p]][[i]]
+    
+    lg <- round(qtl_matrix["LG", 1], 3)
+    pos <- round(qtl_matrix["pos", 1], 3)
+    global_LOD <- round(qtl_matrix["LOD_Ha", 1], 2) 
+    Estimate_M9 <- round(qtl_matrix["alpha_p", 1], 3)  #M9 estimate
+    lod_M9 <- round(qtl_matrix["LOD_H1", 1], 2) #LOD for M9 with 2 decimal places
+    Estimate_M19 <- round(qtl_matrix["alpha_q", 1], 3)  #M19 estimate
+    lod_M19 <- round(qtl_matrix["LOD_H2", 1], 2)  #LOD for M19 with 2 decimal places
+    Estimate_Dominance <- round(qtl_matrix["delta_pq", 1], 3) #dominance effect
+    lod_Dominance <- round(qtl_matrix["LOD_H3", 1], 2) #LOD for dominance with 2 decimal places
+
+    qtl_data <- rbind(qtl_data, data.frame(
+      lg = lg,
+      pos = pos,
+      global_LOD = global_LOD,
+      Estimate_M9 = Estimate_M9,
+      lod_M9 = lod_M9,
+      Estimate_M19 = Estimate_M19,
+      lod_M19 = lod_M19,
+      Estimate_Dominance = Estimate_Dominance,
+      lod_Dominance = lod_Dominance
+    ))
+    
+    draw_phase(fullsib = cofs_fs[[p]], fullsib.char = qtl[[p]][[i]])
+    get_segr(qtl[[p]][[i]])
+  }
+  
+  table_data[[trait]] <- qtl_data
+}
+
+for (trait in trait_names) {
+  print(knitr::kable(table_data[[trait]], format = "pipe", caption = paste("Tabela de QTLs para", trait)))
+}
+```
+
 #### R2 of each QTL
 
 ```{r}
